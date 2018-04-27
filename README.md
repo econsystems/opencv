@@ -36,7 +36,7 @@
 
 #### bool setFormatType(int format);
 
-* Set the video format, resoluion and fps to the device. 
+* Set the video format, resolution and fps to the device. 
 
 
 #### bool get(int propId, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
@@ -52,13 +52,21 @@
 
 ## OpenCVCam Command Line Application
 
-* OpenCVCam command line application can be used to access the UVC settings, HID settings, preview and Image capture of any e-con System cameras in both Windows and Linux.
+* OpenCVCam command line application can be used to access the UVC settings, HID settings, Streaming and Image capture of any e-con System cameras in both Windows and Linux.
 
 
 
 ## How to Use
 
-* Download OpenCV from [here]()
+* OpenCV can be downloaded from [here](https://github.com/opencv/opencv)
+```
+* cd opencv
+```
+
+```
+* git checkout 3.3.1
+```
+
 * Replace Videoio module from OpenCV with [this videoio module](https://github.com/econsystems/opencv/tree/master/Sources)
 * Build OpenCV using [this Installation manual](https://github.com/econsystems/opencv/tree/master/Documents)
 * Information on how to use those newly Introduced APIs were [explained in API Documentation](https://github.com/econsystems/opencv/tree/master/Documents)
