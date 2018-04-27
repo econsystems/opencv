@@ -59,9 +59,8 @@
 ## How to Use
 
 * Download OpenCV from [here]()
-* Replace Videoio module from OpenCV with [this videoio module]()
-* Build OpenCV using [this Installation manual]()
-* Information on how to use those newly Introduced APIs were [explained in API Documentation]()
-* Run Sample application using [this user manual]()
-
-
+* Replace Videoio module from OpenCV with [this videoio module](https://github.com/econsystems/opencv/tree/master/Sources)
+* Build OpenCV using [this Installation manual](https://github.com/econsystems/opencv/tree/master/Documents)
+* Information on how to use those newly Introduced APIs were [explained in API Documentation](https://github.com/econsystems/opencv/tree/master/Documents)
+* OpenCVCam command line application can be downloaded [from here](https://github.com/econsystems/opencv/tree/master/Sources), which is used to access OpenCV APIs
+* Run Sample application using [this user manual](https://github.com/econsystems/opencv/tree/master/Documents)
