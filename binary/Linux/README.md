@@ -1,4 +1,4 @@
-#Run Linux Sample Application
+# Run Linux Sample Application
 
 ### Initially run the script file 
 
