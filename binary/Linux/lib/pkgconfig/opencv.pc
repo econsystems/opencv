@@ -1,6 +1,6 @@
 # Package Information for pkg-config
 
-prefix=/opt/binary
+prefix=/usr/local
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir_old=${prefix}/include/opencv
