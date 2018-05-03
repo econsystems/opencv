@@ -60,11 +60,11 @@
 
 * OpenCV can be downloaded from [here](https://github.com/opencv/opencv)
 ```
-* cd opencv
+	$ cd opencv
 ```
 
 ```
-* git checkout 3.3.1
+	$ git checkout 3.3.1
 ```
 
 * Replace Videoio module from OpenCV with [this videoio module](https://github.com/econsystems/opencv/tree/master/sources)
