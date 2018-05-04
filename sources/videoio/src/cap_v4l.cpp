@@ -2305,7 +2305,7 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, long value
 
 		if(property_id == CV_CAP_PROP_EXPOSURE)
 		{
-			control.id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
+			control.id = capPropertyToV4L2(CV_CAP_PROP_EXPOSURE);
 			control.value = V4L2_EXPOSURE_MANUAL;
 //            v4l2_control control = {v4l2id, 0};
             if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
