@@ -575,7 +575,7 @@ bool configFormats()
 #endif
 		}
 
-		while((index < 0) || (index > option))
+		while((index < 0) || (index >= option))
         {
             cout << endl << "Pick a choice to set Particular Preview Format : " << endl;
             cin >> index;

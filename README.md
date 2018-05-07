@@ -2,7 +2,7 @@
 
 ## Videoio Module
 
-	* This Videoio Module can be supported for both Opencv version 3.3.1 and 3.4.1 with both Linux and Windows OS.
+* This Videoio Module can be supported for both Opencv version 3.3.1 and 3.4.1 with both Linux and Windows OS.
 
 ### APIs Introduced
 
@@ -76,4 +76,16 @@
 
 ## Supported Camera's
 
-* e-con's See3CAM_12CUNIR(Y16), See3CAM_CU51(Y16), See3CAM_CU40(Y16), See3CAM_10CUG_C(BY8), See3CAM_130 – 4K Autofocus USB 3.0 Camera Board (Color), See3CAM_CU135 – 4K Custom Lens USB 3.0 Camera Board (Color) and See3CAM_CU130 - Custom Lens USB 3.0 Camera Board (Color) were supported by this sample command line application.
+	* See3CAM_CU20 
+	* See3CAM_CU30
+	* See3CAM_CU40
+	* See3CAMCU50
+	* See3CAM_CU51
+	* See3CAM_CU130
+	* See3CAM_CU135
+	* See3CAM_10CUG
+	* See3CAM_11CUG
+	* See3CAM_12CUNIR
+	* See3CAM_30
+	* See3CAM_81
+	* See3CAM_130 Autofocus
