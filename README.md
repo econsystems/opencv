@@ -2,6 +2,8 @@
 
 ## Videoio Module
 
+	* This Videoio Module can be supported for both Opencv version 3.3.1 and 3.4.1 with both Linux and Windows OS.
+
 ### APIs Introduced
 
 * bool getDevices(int &devices);
@@ -61,10 +63,8 @@
 * OpenCV can be downloaded from [here](https://github.com/opencv/opencv)
 ```
 	$ cd opencv
-```
 
-```
-	$ git checkout 3.3.1
+	$ git checkout <opencv version>
 ```
 
 * Replace Videoio module from OpenCV with [this videoio module](https://github.com/econsystems/opencv/tree/master/sources)
@@ -72,3 +72,8 @@
 * Information on how to use those newly Introduced APIs were [explained in API Documentation](https://github.com/econsystems/opencv/tree/master/documents)
 * OpenCVCam command line application can be downloaded [from here](https://github.com/econsystems/opencv/tree/master/sources), which is used to access OpenCV APIs
 * Run Sample application using [this user manual](https://github.com/econsystems/opencv/tree/master/documents)
+
+
+## Supported Camera's
+
+* e-con's See3CAM_12CUNIR(Y16), See3CAM_CU51(Y16), See3CAM_CU40(Y16), See3CAM_10CUG_C(BY8), See3CAM_130 – 4K Autofocus USB 3.0 Camera Board (Color), See3CAM_CU135 – 4K Custom Lens USB 3.0 Camera Board (Color) and See3CAM_CU130 - Custom Lens USB 3.0 Camera Board (Color) were supported by this sample command line application.
