@@ -154,38 +154,47 @@ void stream()
             {
                 cap >> Frame;
             }
-
-			if((_12CUNIR) || (_CU51))
-			{		
-				//Convert to 8 Bit: 
-				//Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
-				convertScaleAbs(Frame, ResultImage, 0.06226);
-
-				namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-				imshow("OpenCVCam", ResultImage);
-			}
-			else if(_CU40)
-			{
-				//Convert to 8 Bit: 
-				//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
-				convertScaleAbs(Frame, BayerFrame8, 0.249023);
-
-				//Filling the missing G -channel bayer data
-				ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
 		
-				//Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
-				cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
-
-				namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
-				imshow("OpenCVCam BGR Frame", BGRImage);
-
-				namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
-				imshow("OpenCVCam IR Frame", IRImage);
-			}
-			else //10CUG and other camera's
+			if(!Frame.empty())
 			{
-				namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-				imshow("OpenCVCam", Frame);
+				if((_12CUNIR) || (_CU51))
+				{		
+					//Convert to 8 Bit: 
+					//Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
+					convertScaleAbs(Frame, ResultImage, 0.06226);
+	
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", ResultImage);
+				}
+				else if(_CU40)
+				{
+					//Convert to 8 Bit: 
+					//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
+					convertScaleAbs(Frame, BayerFrame8, 0.249023);
+	
+					//Filling the missing G -channel bayer data
+					ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
+			
+					//Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
+					cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+
+					namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam BGR Frame", BGRImage);
+	
+					namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam IR Frame", IRImage);
+				}
+				else if(_10CUG_C) //10CUG and other camera's
+				{
+					cvtColor(Frame, BGRImage, COLOR_BayerGB2BGR);
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", BGRImage);
+				}
+				else
+				{
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", Frame);
+				}
 			}
             keyPressed = waitKey(10);
 
@@ -219,44 +228,47 @@ void *preview(void *arg)
             {
                 cap >> Frame;
             }
-
-			if((_12CUNIR) || (_CU51))
-			{		
-				//Convert to 8 Bit: 
-				//Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
-				convertScaleAbs(Frame, ResultImage, 0.06226);
-
-				namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-				imshow("OpenCVCam", ResultImage);
-			}
-			else if(_CU40)
+			
+			if(!Frame.empty())
 			{
-				//Convert to 8 Bit: 
-				//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
-				convertScaleAbs(Frame, BayerFrame8, 0.249023);
+				if((_12CUNIR) || (_CU51))
+				{		
+					//Convert to 8 Bit: 
+					//Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
+					convertScaleAbs(Frame, ResultImage, 0.06226);
 
-				//Filling the missing G -channel bayer data
-				ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
-		
-				//Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
-				cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", ResultImage);
+				}
+				else if(_CU40)
+				{
+					//Convert to 8 Bit: 
+					//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
+					convertScaleAbs(Frame, BayerFrame8, 0.249023);
 
-				namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
-				imshow("OpenCVCam BGR Frame", BGRImage);
+					//Filling the missing G -channel bayer data
+					ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
+			
+					//Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
+					cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
 
-				namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
-				imshow("OpenCVCam IR Frame", IRImage);
-			}
-			else if(_10CUG_C) //10CUG and other camera's
-			{
-				cvtColor(Frame, BGRImage, COLOR_BayerGB2BGR);
-				namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-				imshow("OpenCVCam", BGRImage);
-			}
-            else if(!Frame.empty())
-			{
-				namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-				imshow("OpenCVCam", Frame);
+					namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam BGR Frame", BGRImage);	
+	
+					namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam IR Frame", IRImage);
+				}
+				else if(_10CUG_C) //10CUG and other camera's
+				{
+					cvtColor(Frame, BGRImage, COLOR_BayerGB2BGR);
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", BGRImage);
+				}
+    	        else
+				{
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", Frame);
+				}
 			}
             keyPressed = waitKey(5);
 
@@ -369,15 +381,11 @@ bool listDevices()
 
 	while((camId < 0) || (camId > devices))
 	{
-		cout << endl << "Pick a Camera Device to Explore : " << '\t';
-		cin >> camId;
-		while(cin.fail())
+		printf("\n Pick a Camera Device to Explore : \t");
+		scanf("%d", &camId);
+		while(getchar() != '\n' && getchar() != EOF)
 		{
-			cout << "Enter a valid Integer value: " << endl;
-			cin.clear();
-			cin.ignore(256, '\n');
-			cin >> camId;
-		}	
+		}
 	}
 
 	switch(camId)
@@ -438,7 +446,45 @@ bool listDevices()
 		if(cap.isOpened())
 			cap.release();
 
+#ifdef __linux__
+		struct udev *udev;
+		struct udev_enumerate *enumerate;
+		struct udev_list_entry *devices, *dev_list_entry;
+		struct udev_device *dev;
+		udev = udev_new();
+		if (!udev) 
+		{
+       		printf("Can't create udev\n");
+	        exit(1);
+	    }
+		int camdevices = 0, indexId;
+    	enumerate = udev_enumerate_new(udev);
+	    udev_enumerate_add_match_subsystem(enumerate, "video4linux");
+    	udev_enumerate_scan_devices(enumerate);
+	    devices = udev_enumerate_get_list_entry(enumerate);
+	    udev_list_entry_foreach(dev_list_entry, devices) 
+		{
+	        const char *pathvid;	
+	        pathvid = udev_list_entry_get_name(dev_list_entry);
+	        dev = udev_device_new_from_syspath(udev, pathvid);
+			const char *pathvalue = udev_device_get_devnode(dev);
+			indexId = pathvalue[10] - '0';
+	        udev_device_unref(dev);
+			camdevices++;	
+			if(camdevices == camId)
+				break;
+	    }
+	    udev_enumerate_unref(enumerate);
+	
+	    udev_unref(udev);
+
+#endif
+
+#ifdef _WIN32
 		if(cap.open(camId - 1))
+#elif __linux__
+		if(cap.open(indexId))
+#endif
     	{
     		if(!cap.isOpened())
 	        {
@@ -459,11 +505,6 @@ bool listDevices()
 
 #elif __linux__
 
-		struct udev *udev;
-		struct udev_enumerate *enumerate;
-		struct udev_list_entry *devices, *dev_list_entry;
-		struct udev_device *dev;
-	
 		udev = udev_new();
 		if (!udev) 
 		{
@@ -502,6 +543,7 @@ bool listDevices()
 
 		udev_enumerate_unref(enumerate);
 		udev_unref(udev);  
+
 		if(hid_fd > 0)
 			closeHID();
 
@@ -509,8 +551,8 @@ bool listDevices()
         if(hid_fd < 0)
             bOpenHID = false;
         bOpenHID = true;
-		bSwitch = false;
-		bPreviewSet(1, true);
+		//bSwitch = false;
+		//bPreviewSet(1, true);
 #endif
 		bSwitch = false;
 		bPreviewSet(1, true);
@@ -575,17 +617,13 @@ bool configFormats()
 #endif
 		}
 
-		while((index < 0) || (index >= option))
+		while((index < 0) || (index > option))
         {
-            cout << endl << "Pick a choice to set Particular Preview Format : " << endl;
-            cin >> index;
-            while(cin.fail())
-            {
-                cout <<  "Enter a Valid Integer Value : " << endl;
-                cin.clear();
-                cin.ignore(256, '\n');
-                cin >> index;
-            }
+            printf("\nPick a choice to set a Particular Preview Format: \t");
+			scanf("%d", &index);
+			while(getchar() != '\n' && getchar() != EOF)
+			{
+			}
         }
 		
 		switch(index)
@@ -690,31 +728,22 @@ bool setVidProp(int Property, string PropStr)
 		case AUTOANDMANUAL:
 			while((mode <= 0) || (mode > 2))
 			{
-				cout << "Enter a valid mode to get selected: 1. Auto 2. Manual " << endl;
-                cin >> mode;
-                while(cin.fail())
-                {
-
-                    cout << "Enter a Valid Integer value: " << endl;
-                    cin.clear();
-                    cin.ignore(256,'\n');
-                    cin >> mode;
-                }
+				printf("\n Enter a Valid mode to get selected: 1. Auto 2. Manual \n");
+				scanf("%d", &mode);
+				while(getchar() != '\n' && getchar() != EOF)
+				{	
+				}
 			}
 			break;
 		}
 	
 		while(mode == MANUAL)
 		{
-			cout << "Enter a Valid value to Set " << PropStr << ": " << endl;
-            cin >> value;
-            while(cin.fail())
-            {
-                cout << "Enter a Valid Integer value: " << endl;
-                cin.clear();
-                cin.ignore(256,'\n');
-                cin >> value;
-            }
+			cout << endl << "Enter a Valid value to Set " << PropStr << " : " << '\t';
+			scanf("%ld", &value);
+			while(getchar() != '\n' && getchar() != EOF)
+			{	
+			}
             if( (value >= minimum) && (value <= maximum) && ((value%steppingDelta) == 0))
             {
                 break;
@@ -780,15 +809,11 @@ bool configUVCSettings()
 
 		while((choice < 0) || (choice >= settings))
         {
-            cout << endl << "Pick a Choice to Configure UVC Settings : " << '\t';
-            cin >> choice;
-            while(cin.fail())
-            {
-                cout << "Enter a Valid Integer value: " << endl;
-                cin.clear();
-                cin.ignore(256,'\n');
-                cin >> choice;
-            }
+			printf("\n Pick a Choice to Configure UVC Settings : \t");
+			scanf("%d", &choice);
+			while(getchar() != '\n' && getchar() != EOF)
+			{	
+			}
         }
 
 		dilemma = 'y';
@@ -998,15 +1023,11 @@ bool hidProp()
 
         while((choice < 0) || (choice > 3))
         {
-            cout << endl << "Pick a Relevant Choice to Configure Particular Camera Properties: " << '\t';
-            cin >> choice;
-            while(cin.fail())
-            {
-                cout << "Enter a Valid Integer value: " << endl;
-                cin.clear();
-                cin.ignore(256,'\n');
-                cin >> choice;
-            }
+			printf("\n Pick a Relevant Choice to Configure Particular Camera Properties: \t");
+			scanf("%d", &choice);
+			while(getchar() != '\n' && getchar() != EOF)
+			{	
+			}
         }
 		
 		switch(choice)
@@ -1069,30 +1090,22 @@ bool exploreCam()
 			cout << '\t' << "5 - HID Properties" << endl;
 			while((choice < 0) || (choice > 5))
             {
-                cout << endl << "Pick a Relevant Choice to Configure Particular Camera Properties : " << '\t';
-                cin >> choice;
-                while(cin.fail())
-                {
-                    cout << "Enter a Valid Integer value: " << endl;
-                    cin.clear();
-                    cin.ignore(256,'\n');
-                    cin >> choice;
-                }
+				printf("\n Pick a Relevant Choice to Configure Particular Camera Properties : \t");
+				scanf( "%d", &choice);
+				while(getchar() != '\n' && getchar() != EOF)
+				{	
+				}
             }
 		}
 		else
 		{
 			while((choice < 0) || (choice >= 5))
             {
-                cout << endl << "Pick a Relevant Choice to Configure particular Camera Properties : " << '\t';
-                cin >> choice;
-                while(cin.fail())
-                {
-                    cout << "Enter a Valid Integer value: " << endl;
-                    cin.clear();
-                    cin.ignore(256, '\n');
-                    cin >> choice;
-                }
+				printf("\n Pick a Relevant Choice to Configure Particular Camera Properties : \t");
+				scanf( "%d", &choice);
+				while(getchar() != '\n' && getchar() != EOF)
+				{	
+				}
             }
 		}
 
