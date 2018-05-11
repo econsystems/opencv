@@ -184,12 +184,6 @@ void stream()
 					namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam IR Frame", IRImage);
 				}
-				else if(_10CUG_C) //10CUG and other camera's
-				{
-					cvtColor(Frame, BGRImage, COLOR_BayerGB2BGR);
-					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-					imshow("OpenCVCam", BGRImage);
-				}
 				else
 				{
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
@@ -1179,12 +1173,3 @@ bool exploreCam()
 	
 	return true;
 }
-
-
-
-
-
-
-
-
-
