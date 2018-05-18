@@ -325,7 +325,6 @@ int main()
 	
 	if(cap.isOpened())
 	{
-		//closeHID();
 		cap.release();
 	}
 
@@ -545,8 +544,6 @@ bool listDevices()
         if(hid_fd < 0)
             bOpenHID = false;
         bOpenHID = true;
-		//bSwitch = false;
-		//bPreviewSet(1, true);
 #endif
 		bSwitch = false;
 		bPreviewSet(1, true);
