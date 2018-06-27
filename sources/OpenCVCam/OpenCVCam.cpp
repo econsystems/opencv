@@ -567,10 +567,14 @@ bool configFormats()
 		if(!(cap.getFormats(formats)))
 		{
 			cout << endl << "Get Total number of Formats Failed" << endl;
-            return false;
+		        return false;
 		}
 		
+#ifdef _WIN32
 		cout << endl << "Total Number of Formats Supported by the Camera:  " << '\t' << formats/2 << endl;
+#elif __linux__
+		cout << endl << "Total Number of Formats supported by the Camera:  " << '\t' << formats << endl;
+#endif
 
         cout << '\t' << "0 - Exit" << endl;
         cout << '\t' << "1 - Back" << endl;
@@ -608,7 +612,7 @@ bool configFormats()
 #endif
 		}
 
-		while((index < 0) || (index > option))
+		while((index < 0) || (index >= option))
         {
             printf("\nPick a choice to set a Particular Preview Format: \t");
 			scanf("%d", &index);
@@ -750,8 +754,16 @@ bool setVidProp(int Property, string PropStr)
 
 		((mode == AUTO) ? (cout << endl << "Auto " << PropStr << " Mode is Set" << endl) : (cout << endl << "Manual " << PropStr << " Mode is set with the Value : " << value << endl));
 
-        cout << endl << "Camera " << PropStr << " Exploration: " << '\n' << "Enter y/Y to Continue, Any other key to dis-Continue: " << '\t';
-        cin >> dilemma;
+		cout << endl << "Camera " << PropStr << " Exploration: " << '\n' ;
+		while(true)
+		{
+			cout << endl << "Enter y/Y to Continue or n/N to dis-Continue: " << '\t';
+			scanf("%c", &dilemma);
+			while(getchar() != '\n' && getchar() != EOF)
+			{}
+			if( dilemma == 'y' || dilemma == 'Y' || dilemma == 'n' || dilemma == 'N')
+				break;
+		}
 	}
 
 	return true;
@@ -875,13 +887,22 @@ bool configUVCSettings()
 bool captureStill()
 {
 	int num;
-	char buf[50];
+	char buf[240], buf1[240];
+	memset(buf, 0, 240);
+	memset(buf1, 0, 240);
 	time_t t = time(0);
 #ifdef _WIN32
 	
 	struct tm tm;
     localtime_s(&tm, &t);
-    num = sprintf_s(buf, "OpenCVCam%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	
+	if(_CU40)
+	{
+		num = sprintf_s(buf, "OpenCVCamBGR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		num = sprintf_s(buf1, "OpenCVCamIR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	}
+	else
+		num = sprintf_s(buf, "OpenCVCam%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 #elif __linux__
 
@@ -891,17 +912,56 @@ bool captureStill()
     char cwd[256];
     getcwd(cwd, sizeof(cwd));
 
-    sprintf(buf, "%s/OpenCVCam%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+	if(_CU40)
+	{	sprintf(buf, "%s/OpenCVCamBGR%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+		sprintf(buf1, "%s/OpenCVCamIR%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+	}
+	else
+		sprintf(buf, "%s/OpenCVCam%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
 #endif
-
 	if(cap.read(Frame))
-    {
-        imwrite(buf, Frame);
-    }
-    cout << endl << '\t' << buf << " image is saved " << endl << endl;
+	{
+		if(!Frame.empty())
+		{
+			if((_12CUNIR) || (_CU51))
+			{		
+				//Convert to 8 Bit: 
+				//Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
+				convertScaleAbs(Frame, ResultImage, 0.06226);
+				imwrite(buf, ResultImage);
+			}
+			else if(_CU40)
+			{
+				//Convert to 8 Bit: 
+				//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
+				convertScaleAbs(Frame, BayerFrame8, 0.249023);
+	
+				//Filling the missing G -channel bayer data
+				bPreviewSet(1, false);
+				ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
+				bPreviewSet(1, true);
+			
+				//Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
+				cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+
+				imwrite(buf, BGRImage);		
+				imwrite(buf1, IRImage);		
+				cout << endl << '\t' << buf1 << " image is saved " << endl;
+			}
+			else
+			{
+				imwrite(buf, Frame);
+			}
+			cout << endl << '\t' << buf << " image is saved " << endl << endl;
+		}
+	}
+
+	memset(buf, 0, 240);
+	memset(buf1, 0, 240);
 
 	return true;
+
 }
 
 
