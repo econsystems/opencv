@@ -35,9 +35,10 @@ using namespace cv;
 #define EXIT				0
 #define AUTO				1
 #define MANUAL				2
-#define AUTOANDMANUAL		3
-#define	READFIRMWAREVERSION	0X40
-#define BUFFERLENGTH		65
+#define AUTOANDMANUAL			3
+#define	READFIRMWAREVERSION		0X40
+#define BUFFERLENGTH			65
+#define SDK_VERSION			"1.0.0"
 
 #ifdef _WIN32
 
@@ -281,6 +282,7 @@ int main()
 	//Basic Introduction about the Application
 	cout << endl << "e-con's Sample OpenCV Application to Custom Formats " << endl;
 	cout << endl << "Demonstrates the working of e-con's Custom Format cameras with the modified libraries of OpenCV" << endl;
+	cout << endl << "\t" << "OpenCV SDK-Version = " << SDK_VERSION << "\n\n";
 
 #ifdef _WIN32
 	hinstLib = LoadLibrary(L"eCAMFwSw.dll");
@@ -570,11 +572,7 @@ bool configFormats()
 		        return false;
 		}
 		
-#ifdef _WIN32
-		cout << endl << "Total Number of Formats Supported by the Camera:  " << '\t' << formats/2 << endl;
-#elif __linux__
-		cout << endl << "Total Number of Formats supported by the Camera:  " << '\t' << formats << endl;
-#endif
+		cout << endl << "Total Number of Formats Supported by the Camera:  " << '\t' << formats << endl;
 
         cout << '\t' << "0 - Exit" << endl;
         cout << '\t' << "1 - Back" << endl;
@@ -583,33 +581,13 @@ bool configFormats()
 
 		for(int formatList = 0; formatList < formats; formatList++)
 		{
-#ifdef _WIN32
-
-			//Skipping the Format_VideoInfo2, Only Format_VideoInfo is allowed
-            if((formatList % 2) == 0)
-            {
-                //Display Camera Formats Supported by the Camera
-                if(!(cap.getFormatType(formatList, formatType, width, height, fps)))
-                {
-                    cout << endl << "Camera Get Format Type Failed" << endl;
-                    return false;
-                }
-                cout << '\t' << option << " . " << "FormatType: " << formatType << " Width: " << width << " Height: " << height << " Fps: " << fps << endl;
-                option++;
-            }
-
-#elif __linux__
-
 			if(!(cap.getFormatType(formatList, formatType, width, height, fps)))
-            {
-                cout << endl << "Camera Get Format Type Failed" << endl;
-                return false;
-            }
-
-            cout << '\t' << option << " . " << "FormatType = " << formatType << "  Width = " << width << "  Height = " << height << " FPS = " << fps << endl;
-            option++;
-
-#endif
+			{
+				cout << endl << "Camera Get Format Type Failed" << endl;
+				return false;
+			}
+			cout << '\t' << option << " . " << "FormatType: " << formatType << " Width: " << width << " Height: " << height << " Fps: " << fps << endl;
+			option++;
 		}
 
 		while((index < 0) || (index >= option))
@@ -649,24 +627,14 @@ bool configFormats()
 
 		default:
 			bReadSet(1, false);
-#ifdef _WIN32
-			
-			if(!(cap.setFormatType(2*(index - 3))))
+			if(!(cap.setFormatType(index - 3)))
             {
                 cout << endl << "Camera Set Format Type Failed" << endl;
                 return false;
             }
-
-#elif __linux__
-
-			if(!(cap.setFormatType(index - 3)))
-            {
-                cout << endl << "Camera Set Format Type Faied" << endl;
-                return false;
-            }
-            
-#endif
 			bReadSet(1, true);
+			if(cap.getFormatType((index-3), formatType, width, height, fps))
+				cout << "\n\t The Current set Format type = " << formatType << " Width = " << width << " Height = " << height << " FPS = " << fps << "\n\n";
 
 			formatType = '\0';
 			width = height = fps = 0;

@@ -375,6 +375,7 @@ static void DebugPrintOut(const char *format, ...)
 #define VI_MAX_CAMERAS  20
 #define VI_NUM_TYPES    21 //MGB //y16 
 #define VI_NUM_FORMATS  18 //DON'T TOUCH
+#define VI_NUM_FORMATS_SUPPORT 255
 
 //defines for setPhyCon - tuner is not as well supported as composite and s-video
 #define VI_COMPOSITE 0
@@ -639,7 +640,10 @@ class videoInput{
 		static char vendorId[VI_MAX_CAMERAS][255];
 		static char productId[VI_MAX_CAMERAS][255];
 		static char devicePaths[VI_MAX_CAMERAS][255];
-
+		static long vWidth[VI_MAX_CAMERAS][255];
+		static long vHeight[VI_MAX_CAMERAS][255];
+		static long vFps[VI_MAX_CAMERAS][255];
+		static string vFmtType[VI_MAX_CAMERAS][255];
 };
 
 ///////////////////////////  HANDY FUNCTIONS  /////////////////////////////
@@ -1301,6 +1305,15 @@ bool videoInput::setupDevice(int deviceNumber, int w, int h, int _connection){
     return false;
 }
 
+float round(float var)
+{
+    // 37.66666 * 100 =3766.66
+    // 3766.66 + .5 =3767.16    for rounding off value
+    // then type cast to int so value is 3766
+    // then divided by 100 so the value converted into 37.66
+    float value = (int)(var * 100 + .5);
+    return (float)value / 100;
+}
 
 // ----------------------------------------------------------------------
 // Get total number of Formats/Resolution/Fps supported by the Specific Camera
@@ -1320,8 +1333,62 @@ bool videoInput::getFormats(int deviceID, int &formats)
     }
 
 	hr = VDList[deviceID]->pCaptureGraph->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, VDList[deviceID]->pVideoInputFilter, IID_IAMStreamConfig, (void **)&VDList[deviceID]->streamConf);
-	int iSize = 0;
-	hr = VDList[deviceID]->streamConf->GetNumberOfCapabilities(&formats, &iSize);
+	if (FAILED(hr))    // FAILED is a macro that tests the return value
+    {
+        DebugPrintOut("ERROR - Could not Find interface for the Capture Pin\n");
+        return false;
+    }
+	formats = 0;
+	int iSize = 0, iCount = 0;
+	IAMVideoControl *pAMVidControl = NULL;
+	IPin *pCameraCapturePin = NULL;
+	char guidstr[8];
+
+	hr = VDList[deviceID]->pVideoInputFilter->QueryInterface(IID_IAMVideoControl, (void**)&pAMVidControl);
+	if (FAILED(hr))    // FAILED is a macro that tests the return value
+    {
+        DebugPrintOut("ERROR - Could not query interface for IAMVideoControl\n");
+        return false;
+    }
+
+	hr = VDList[deviceID]->pCaptureGraph->FindPin(VDList[deviceID]->pVideoInputFilter, PINDIR_OUTPUT, 0, 0, TRUE, 0, &pCameraCapturePin);
+	if(SUCCEEDED(hr))
+	{
+		hr = VDList[deviceID]->streamConf->GetNumberOfCapabilities(&iCount, &iSize);
+		if(iSize == sizeof(VIDEO_STREAM_CONFIG_CAPS))
+		{
+			for (int iFormat = 0; iFormat < iCount; iFormat += 2)
+			{
+				VIDEO_STREAM_CONFIG_CAPS scc;
+				AM_MEDIA_TYPE *pmt;
+
+				hr = VDList[deviceID]->streamConf->GetStreamCaps(iFormat, &pmt, (BYTE*)&scc);
+
+				if(SUCCEEDED(hr))
+				{
+					LONGLONG *lFrameRate = NULL;
+					long lListSize = 0;
+					SIZE FrameSize;
+					
+					FrameSize.cx = scc.InputSize.cx;
+					FrameSize.cy = scc.InputSize.cy;
+
+					pAMVidControl->GetFrameRateList(pCameraCapturePin, iFormat, FrameSize, &lListSize, &lFrameRate);
+									
+					for( long lIndex = 0; lIndex < lListSize; lIndex++ )
+					{
+						vFps[deviceID][formats] = round( (float)10000000 / (float( *(lFrameRate + lIndex) )));	
+						vWidth[deviceID][formats] = scc.InputSize.cx;
+						vHeight[deviceID][formats] = scc.InputSize.cy;
+						getMediaSubtypeAsString(pmt->subtype, guidstr);
+						vFmtType[deviceID][formats] = guidstr;
+						formats++;
+					}
+				}			
+			}
+		}
+	}
+
 	CoUninitialize();
 	return true;
 }
@@ -1335,29 +1402,11 @@ bool videoInput::getFormatType(int deviceID, int formats, cv::String &formatType
 {
 	CoInitialize(0);
 
-	VIDEOINFOHEADER *pvi;
-	VIDEO_STREAM_CONFIG_CAPS scc;
-    AM_MEDIA_TYPE *pmtConfig;
-
-	char guidstr[8];
-	HRESULT hr =  VDList[deviceID]->streamConf->GetStreamCaps(formats, &pmtConfig, (BYTE*)&scc);
-	if (SUCCEEDED(hr))
-	{
-		if(pmtConfig->formattype != FORMAT_VideoInfo)
-		{
-			MyDeleteMediaType(pmtConfig);
-			CoUninitialize();
-			return false;
-		}
-		pvi = (VIDEOINFOHEADER *)pmtConfig->pbFormat;
-		getMediaSubtypeAsString(pmtConfig->subtype, guidstr);
-		formatType =  guidstr; // pmtConfig->subtype;
-		width = pvi->bmiHeader.biWidth;
-		height = pvi->bmiHeader.biHeight;
-		fps = int(10000000/scc.MinFrameInterval);
+	formatType =  vFmtType[deviceID][formats];
+	width = vWidth[deviceID][formats];
+	height = vHeight[deviceID][formats];
+	fps = vFps[deviceID][formats];
 		
-	}
-	MyDeleteMediaType(pmtConfig);
 	CoUninitialize();
 	return true;
 }
@@ -1426,6 +1475,10 @@ char videoInput::deviceNames[VI_MAX_CAMERAS][255]={{0}};
 char videoInput::vendorId[VI_MAX_CAMERAS][255]={{0}};
 char videoInput::productId[VI_MAX_CAMERAS][255]={{0}};
 char videoInput::devicePaths[VI_MAX_CAMERAS][255]={{0}};
+long videoInput::vWidth[VI_MAX_CAMERAS][255]={{0}};
+long videoInput::vHeight[VI_MAX_CAMERAS][255]={{0}};
+long videoInput::vFps[VI_MAX_CAMERAS][255]={{0}};
+string videoInput::vFmtType[VI_MAX_CAMERAS][255];
 
 char * videoInput::getDeviceName(int deviceID){
     if( deviceID >= VI_MAX_CAMERAS ){
@@ -3346,7 +3399,7 @@ HRESULT videoInput::getDevice(IBaseFilter** gottaFilter, int deviceId, WCHAR * w
 
                         // We found it, so send it back to the caller
                         hr = pMoniker->BindToObject(NULL, NULL, IID_IBaseFilter, (void**)gottaFilter);
-                        done = true;
+						done = true;
                     }
                     VariantClear(&varName);
                     pPropBag->Release();
