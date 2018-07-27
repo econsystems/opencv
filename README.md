@@ -93,3 +93,7 @@
 ## Releases
 
 * Latest releases can be downloaded from [this link](https://github.com/econsystems/opencv/releases)
+
+## QA Release
+
+* OpenCV v1.0.0		-	27-Jul-18
