@@ -89,3 +89,7 @@
 	* See3CAM_30
 	* See3CAM_81
 	* See3CAM_130 Autofocus
+
+## Releases
+
+* Latest releases can be downloaded from [this link](https://github.com/econsystems/opencv/releases)
