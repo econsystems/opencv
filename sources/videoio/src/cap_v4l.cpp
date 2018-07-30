@@ -373,7 +373,7 @@ static bool icvSetFormatTypeCAM_V4L(CvCaptureCAM_V4L* capture, int index);
 static bool icvGrabFrameCAM_V4L( CvCaptureCAM_V4L* capture );
 static IplImage* icvRetrieveFrameCAM_V4L( CvCaptureCAM_V4L* capture, int );
 
-static double icvGetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id );
+static double icvGetPropertyCAM_V4L( const CvCaptureCAM_V4L* capture, int property_id );
 static bool   icvGetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
 static bool   icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, long value, long mode );
 static int    icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, double value );
@@ -859,9 +859,9 @@ bool CvCaptureCAM_V4L::getFormats(int &formats)
 	return icvGetFormatsCAM_V4L(this, formats);
 }
 
-bool CvCaptureCAM_V4L::getFormatType(int format, String &formatType, int &width, int &height, int &fps)
+bool CvCaptureCAM_V4L::getFormatType(int format, String &formatType, int &gwidth, int &gheight, int &gfps)
 {
-	return icvGetFormatTypeCAM_V4L(this, format, formatType, width, height, fps);
+	return icvGetFormatTypeCAM_V4L(this, format, formatType, gwidth, gheight, gfps);
 }
 
 bool CvCaptureCAM_V4L::setFormatType(int index)
@@ -1764,7 +1764,7 @@ bool CvCaptureCAM_V4L::getDevices(int &devices)
 }
 
 
-bool CvCaptureCAM_V4L::getDeviceInfo(int index, String &deviceName, String &vid, String &pid, String &devicePath)
+bool CvCaptureCAM_V4L::getDeviceInfo(int index, String &gdeviceName, String &vid, String &pid, String &devicePath)
 {
 	DIR *dp;
 	int hDescriptor, ret, rc;
@@ -1807,7 +1807,7 @@ bool CvCaptureCAM_V4L::getDeviceInfo(int index, String &deviceName, String &vid,
 		 	{
 		 		return false;
 			}	
-			deviceName = (char*)querycap.card;
+			gdeviceName = (char*)querycap.card;
 			int videoId = entry->d_name[5] - '0';
 			if(videoId == index)
 				break;
@@ -1949,7 +1949,7 @@ static bool icvGetFormatTypeCAM_V4L(CvCaptureCAM_V4L* capture, int formats, Stri
 
 static bool icvSetFormatTypeCAM_V4L(CvCaptureCAM_V4L* capture, int index)
 {
-	int ret, vidfmt = 0, formatId, width = 0, height = 0, fps = 0;
+    int ret, vidfmt = 0, formatId = 0, width = 0, height = 0, fps = 0;
     struct v4l2_fmtdesc fmt;
     struct v4l2_frmsizeenum frmsize;
     struct v4l2_frmivalenum frmival;
@@ -2308,9 +2308,9 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, long value
 		if(property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U)
 		{
 			v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTO_WHITE_BALANCE);
-			v4l2_control control = {v4l2id, 0};
+			v4l2_control wcontrol = {v4l2id, 0};
 
-			if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE) 
+			if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &wcontrol) && errno != ERANGE) 
 			{
 	       		perror ("VIDIOC_S_CTRL");
 		       	return false;
@@ -2320,9 +2320,9 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, long value
 		if(property_id == CV_CAP_PROP_FOCUS)
 		{
 			v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTOFOCUS);
-			v4l2_control control = {v4l2id, 0};
+			v4l2_control fcontrol = {v4l2id, 0};
 
-			if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE) 
+			if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &fcontrol) && errno != ERANGE) 
 			{
 	       		perror ("VIDIOC_S_CTRL");
 		       	return false;
@@ -2392,9 +2392,9 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, long value
 			value = 1;
 		
 	    /* set which control we want to set */
-	    v4l2_control control = {v4l2id, int(value)};
+	    v4l2_control bcontrol = {v4l2id, int(value)};
 
-		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE) 
+		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &bcontrol) && errno != ERANGE) 
 		{
 	        perror ("VIDIOC_S_CTRL");
 	        return false;

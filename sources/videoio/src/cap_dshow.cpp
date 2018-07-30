@@ -375,7 +375,6 @@ static void DebugPrintOut(const char *format, ...)
 #define VI_MAX_CAMERAS  20
 #define VI_NUM_TYPES    21 //MGB //y16 
 #define VI_NUM_FORMATS  18 //DON'T TOUCH
-#define VI_NUM_FORMATS_SUPPORT 255
 
 //defines for setPhyCon - tuner is not as well supported as composite and s-video
 #define VI_COMPOSITE 0
@@ -3399,7 +3398,7 @@ HRESULT videoInput::getDevice(IBaseFilter** gottaFilter, int deviceId, WCHAR * w
 
                         // We found it, so send it back to the caller
                         hr = pMoniker->BindToObject(NULL, NULL, IID_IBaseFilter, (void**)gottaFilter);
-						done = true;
+                        done = true;
                     }
                     VariantClear(&varName);
                     pPropBag->Release();

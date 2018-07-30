@@ -143,6 +143,21 @@ CVAPI(int) cvGrabFrame( CvCapture* capture );
   frame decompression, flipping etc.
   @warning !!!DO NOT RELEASE or MODIFY the retrieved frame!!!
 */
+
+
+CVAPI(bool) cvGetFormats( CvCapture* capture, int &formats );
+
+CVAPI(bool) cvGetFormatType(CvCapture* capture, int formats, cv::String &formatType, int &width, int &height, int &fps );
+
+CVAPI(bool) cvSetFormatType(CvCapture* capture, int index);
+
+CVAPI(bool) cvSetVideoProperty(CvCapture* capture, int id, long value, long mode);
+
+CVAPI(CvCapture*) cvGetDevices(int &devices);
+
+CVAPI(CvCapture*) cvGetDeviceInfo(int index, cv::String &deviceName, cv::String &vid, cv::String &pid, cv::String &devicePath);
+
+
 CVAPI(IplImage*) cvRetrieveFrame( CvCapture* capture, int streamIdx CV_DEFAULT(0) );
 
 /** @brief Just a combination of cvGrabFrame and cvRetrieveFrame
