@@ -108,17 +108,12 @@ Thanks to:
 #include <SetupAPI.h>
 #include <devpropdef.h>
 
-#include <vector>
-
 //Include Directshow stuff here so we don't worry about needing all the h files.
 #include "DShow.h"
 #include "strmif.h"
 #include "Aviriff.h"
 #include "dvdmedia.h"
 #include "bdaiface.h"
-#define BUFFERLENGTH 65
-#define TIMEOUT		  5000
-#define READFIRMWAREVERSION 0x40
 
 //for threading
 #include <process.h>
@@ -223,8 +218,6 @@ DEFINE_GUID(PIN_CATEGORY_PREVIEW,0xfb6c4282,0x0353,0x11d1,0x90,0x5f,0x00,0x00,0x
 #define DEFINE_DEVPROPKEY(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8, pid) EXTERN_C const DEVPROPKEY name
 #endif
 DEFINE_DEVPROPKEY(DEVPKEY_DEVICE_PARENT, 0x4340a6c5, 0x93fa, 0x4706, 0x97, 0x2c, 0x7b, 0x64, 0x80, 0x08, 0xa5, 0xa7, 8);
-
-
 
 interface ISampleGrabberCB : public IUnknown
 {
@@ -507,14 +500,14 @@ class videoInput{
         //you MUST CALL isFrameNew every app loop for this to have any effect
         void setAutoReconnectOnFreeze(int deviceNumber, bool doReconnect, int numMissedFramesBeforeReconnect);
 
-		//To get device Info's like vid, pid, devicepath, deviceName 
-		bool getDeviceNames(int index, cv::String &deviceName, cv::String &vid, cv::String &pid, cv::String &devicePath);
+	//To get device Info's like vid, pid, devicepath, deviceName 
+	bool getDeviceNames(int index, cv::String &deviceName, cv::String &vid, cv::String &pid, cv::String &devicePath);
 
-		bool getFormats(int deviceID, int &formats);
+	bool getFormats(int deviceID, int &formats);
 
-		bool getFormatType(int deviceID, int formats, cv::String &formatType, int &width, int &height, int &fps);
+	bool getFormatType(int deviceID, int formats, cv::String &formatType, int &width, int &height, int &fps);
 
-		/*bool setFormatType(int deviceID, int index);*/
+	/*bool setFormatType(int deviceID, int index);*/
 
         //Choose one of these five to setup your device
         bool setupDevice(int deviceID);
@@ -554,16 +547,16 @@ class videoInput{
         //Manual control over settings thanks.....
         //These are experimental for now.
         bool setVideoSettingFilter(int deviceID, long Property, long lValue, long Flags = 0, bool useDefaultValue = false);
-		bool setVideoSettingsFilter(int deviceID, long Property, long lValue, long Flags = 0, bool useDefaultValue = false);
+	bool setVideoSettingsFilter(int deviceID, long Property, long lValue, long Flags = 0, bool useDefaultValue = false);
         bool setVideoSettingFilterPct(int deviceID, long Property, float pctValue, long Flags = 0);
         bool getVideoSettingFilter(int deviceID, long Property, long &min, long &max, long &steppingDelta, long &currentValue, long &flags, long &defaultValue);
-		bool getVideoSettingsFilter(int deviceID, long Property, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
+	bool getVideoSettingsFilter(int deviceID, long Property, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
 
         bool setVideoSettingCamera(int deviceID, long Property, long lValue, long Flags = 0, bool useDefaultValue = false);
-		bool setVideoSettingsCamera(int deviceID, long Property, long lValue, long Flags = 0, bool useDefaultValue = false);
+	bool setVideoSettingsCamera(int deviceID, long Property, long lValue, long Flags = 0, bool useDefaultValue = false);
         bool setVideoSettingCameraPct(int deviceID, long Property, float pctValue, long Flags = 0);
         bool getVideoSettingCamera(int deviceID, long Property, long &min, long &max, long &steppingDelta, long &currentValue, long &flags, long &defaultValue);
-		bool getVideoSettingsCamera(int deviceID, long Property, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
+	bool getVideoSettingsCamera(int deviceID, long Property, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
 
         //bool setVideoSettingCam(int deviceID, long Property, long lValue, long Flags = NULL, bool useDefaultValue = false);
 
@@ -574,9 +567,9 @@ class videoInput{
         int  getFourcc(int deviceID) const;
         double getFPS(int deviceID) const;
 
-		//Included to allocate IplImage for Opencv - e-con
-		GUID getMediasubtype(int deviceID);
-		//Included to allocate IplImage for Opencv - e-con - end
+	//Included to allocate IplImage for Opencv - e-con
+	GUID getMediasubtype(int deviceID);
+	//Included to allocate IplImage for Opencv - e-con - end
 
         //completely stops and frees a device
         void stopDevice(int deviceID);
@@ -636,13 +629,13 @@ class videoInput{
         static void __cdecl basicThread(void * objPtr);
 
         static char deviceNames[VI_MAX_CAMERAS][255];
-		static char vendorId[VI_MAX_CAMERAS][255];
-		static char productId[VI_MAX_CAMERAS][255];
-		static char devicePaths[VI_MAX_CAMERAS][255];
-		static long vWidth[VI_MAX_CAMERAS][255];
-		static long vHeight[VI_MAX_CAMERAS][255];
-		static long vFps[VI_MAX_CAMERAS][255];
-		static string vFmtType[VI_MAX_CAMERAS][255];
+	static char vendorId[VI_MAX_CAMERAS][255];
+	static char productId[VI_MAX_CAMERAS][255];
+	static char devicePaths[VI_MAX_CAMERAS][255];
+	static int vWidth[VI_MAX_CAMERAS][255];
+	static int vHeight[VI_MAX_CAMERAS][255];
+	static int vFps[VI_MAX_CAMERAS][255];
+	static string vFmtType[VI_MAX_CAMERAS][255];
 };
 
 ///////////////////////////  HANDY FUNCTIONS  /////////////////////////////
@@ -651,20 +644,20 @@ class videoInput{
 //Eg: MEDIASUBTYPE_Y800, MEDIASUBTYPE_Y8, MEDIASUBTYPE_GREY
 static bool checkSingleByteFormat(GUID FormatType)
 {
-	bool IsSingleByteFormat = true;
+    bool IsSingleByteFormat = true;
 
-	if(FormatType == MEDIASUBTYPE_Y800 ||
-		FormatType == MEDIASUBTYPE_Y8 ||
-		FormatType == MEDIASUBTYPE_GREY )
-	{
-		IsSingleByteFormat = true;
-	}
-	else
-	{
-		IsSingleByteFormat = false;
-	}
+    if(FormatType == MEDIASUBTYPE_Y800 ||
+	FormatType == MEDIASUBTYPE_Y8 ||
+	FormatType == MEDIASUBTYPE_GREY )
+    {
+	IsSingleByteFormat = true;
+    }
+    else
+    {
+	IsSingleByteFormat = false;
+    }
 
-	return IsSingleByteFormat;
+    return IsSingleByteFormat;
 }
 //Included by e-con - end
 
@@ -1156,10 +1149,10 @@ videoInput::videoInput(){
     mediaSubtypes[17]    = MEDIASUBTYPE_Y8;
     mediaSubtypes[18]    = MEDIASUBTYPE_GREY;
     mediaSubtypes[19]    = MEDIASUBTYPE_I420;
-	//Included by e-con
-	mediaSubtypes[20]    = MEDIASUBTYPE_BY8;
-	mediaSubtypes[21]	 = MEDIASUBTYPE_Y16;
-	//Included by e-con - end
+    //Included by e-con
+    mediaSubtypes[20]    = MEDIASUBTYPE_BY8;
+    mediaSubtypes[21]	 = MEDIASUBTYPE_Y16;
+    //Included by e-con - end
 
     //The video formats we support
     formatTypes[VI_NTSC_M]      = AnalogVideo_NTSC_M;
@@ -1320,76 +1313,75 @@ float round(float var)
 // ----------------------------------------------------------------------
 bool videoInput::getFormats(int deviceID, int &formats)
 {
-	CoInitialize(0);
-	HRESULT hr = getDevice(&VDList[deviceID]->pVideoInputFilter, deviceID, VDList[deviceID]->wDeviceName, VDList[deviceID]->nDeviceName);
+    CoInitialize(0);
+    HRESULT hr = getDevice(&VDList[deviceID]->pVideoInputFilter, deviceID, VDList[deviceID]->wDeviceName, VDList[deviceID]->nDeviceName);
     if(hr != S_OK)	
-		return false;
-	hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, NULL, CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2, (void **)&VDList[deviceID]->pCaptureGraph);
+	return false;
+    hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, NULL, CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2, (void **)&VDList[deviceID]->pCaptureGraph);
     if (FAILED(hr))    // FAILED is a macro that tests the return value
     {
         DebugPrintOut("ERROR - Could not create the Filter Graph Manager\n");
         return false;
     }
 
-	hr = VDList[deviceID]->pCaptureGraph->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, VDList[deviceID]->pVideoInputFilter, IID_IAMStreamConfig, (void **)&VDList[deviceID]->streamConf);
-	if (FAILED(hr))    // FAILED is a macro that tests the return value
+    hr = VDList[deviceID]->pCaptureGraph->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, VDList[deviceID]->pVideoInputFilter, IID_IAMStreamConfig, (void **)&VDList[deviceID]->streamConf);
+    if (FAILED(hr))    // FAILED is a macro that tests the return value
     {
         DebugPrintOut("ERROR - Could not Find interface for the Capture Pin\n");
         return false;
     }
-	formats = 0;
-	int iSize = 0, iCount = 0;
-	IAMVideoControl *pAMVidControl = NULL;
-	IPin *pCameraCapturePin = NULL;
-	char guidstr[8];
+    formats = 0;
+    int iSize = 0, iCount = 0;
+    IAMVideoControl *pAMVidControl = NULL;
+    IPin *pCameraCapturePin = NULL;
+    char guidstr[8];
 
-	hr = VDList[deviceID]->pVideoInputFilter->QueryInterface(IID_IAMVideoControl, (void**)&pAMVidControl);
-	if (FAILED(hr))    // FAILED is a macro that tests the return value
+    hr = VDList[deviceID]->pVideoInputFilter->QueryInterface(IID_IAMVideoControl, (void**)&pAMVidControl);
+    if (FAILED(hr))    // FAILED is a macro that tests the return value
     {
         DebugPrintOut("ERROR - Could not query interface for IAMVideoControl\n");
         return false;
     }
 
-	hr = VDList[deviceID]->pCaptureGraph->FindPin(VDList[deviceID]->pVideoInputFilter, PINDIR_OUTPUT, 0, 0, TRUE, 0, &pCameraCapturePin);
-	if(SUCCEEDED(hr))
+    hr = VDList[deviceID]->pCaptureGraph->FindPin(VDList[deviceID]->pVideoInputFilter, PINDIR_OUTPUT, 0, 0, TRUE, 0, &pCameraCapturePin);
+    if(SUCCEEDED(hr))
+    {
+	hr = VDList[deviceID]->streamConf->GetNumberOfCapabilities(&iCount, &iSize);
+	if(iSize == sizeof(VIDEO_STREAM_CONFIG_CAPS))
 	{
-		hr = VDList[deviceID]->streamConf->GetNumberOfCapabilities(&iCount, &iSize);
-		if(iSize == sizeof(VIDEO_STREAM_CONFIG_CAPS))
+   	    for (int iFormat = 0; iFormat < iCount; iFormat += 2)
+	    {
+		VIDEO_STREAM_CONFIG_CAPS scc;
+		AM_MEDIA_TYPE *pmt;
+
+		hr = VDList[deviceID]->streamConf->GetStreamCaps(iFormat, &pmt, (BYTE*)&scc);
+
+		if(SUCCEEDED(hr))
 		{
-			for (int iFormat = 0; iFormat < iCount; iFormat += 2)
-			{
-				VIDEO_STREAM_CONFIG_CAPS scc;
-				AM_MEDIA_TYPE *pmt;
-
-				hr = VDList[deviceID]->streamConf->GetStreamCaps(iFormat, &pmt, (BYTE*)&scc);
-
-				if(SUCCEEDED(hr))
-				{
-					LONGLONG *lFrameRate = NULL;
-					long lListSize = 0;
-					SIZE FrameSize;
+		    LONGLONG *lFrameRate = NULL;
+		    long lListSize = 0;
+		    SIZE FrameSize;
 					
-					FrameSize.cx = scc.InputSize.cx;
-					FrameSize.cy = scc.InputSize.cy;
+		    FrameSize.cx = scc.InputSize.cx;
+		    FrameSize.cy = scc.InputSize.cy;
 
-					pAMVidControl->GetFrameRateList(pCameraCapturePin, iFormat, FrameSize, &lListSize, &lFrameRate);
+		    pAMVidControl->GetFrameRateList(pCameraCapturePin, iFormat, FrameSize, &lListSize, &lFrameRate);
 									
-					for( long lIndex = 0; lIndex < lListSize; lIndex++ )
-					{
-						vFps[deviceID][formats] = round( (float)10000000 / (float( *(lFrameRate + lIndex) )));	
-						vWidth[deviceID][formats] = scc.InputSize.cx;
-						vHeight[deviceID][formats] = scc.InputSize.cy;
-						getMediaSubtypeAsString(pmt->subtype, guidstr);
-						vFmtType[deviceID][formats] = guidstr;
-						formats++;
-					}
-				}			
-			}
-		}
+		    for( long lIndex = 0; lIndex < lListSize; lIndex++ )
+		    {
+			vFps[deviceID][formats] = round( (float)10000000 / (float( *(lFrameRate + lIndex) )));	
+			vWidth[deviceID][formats] = scc.InputSize.cx;
+			vHeight[deviceID][formats] = scc.InputSize.cy;
+			getMediaSubtypeAsString(pmt->subtype, guidstr);
+			vFmtType[deviceID][formats] = guidstr;
+			formats++;
+		    }
+		}			
+	    }
 	}
-
-	CoUninitialize();
-	return true;
+    }
+    CoUninitialize();
+    return true;
 }
 
 
@@ -1399,15 +1391,15 @@ bool videoInput::getFormats(int deviceID, int &formats)
 // ----------------------------------------------------------------------
 bool videoInput::getFormatType(int deviceID, int formats, cv::String &formatType, int &width, int &height, int &fps)
 {
-	CoInitialize(0);
+    CoInitialize(0);
 
-	formatType =  vFmtType[deviceID][formats];
-	width = vWidth[deviceID][formats];
-	height = vHeight[deviceID][formats];
-	fps = vFps[deviceID][formats];
-		
-	CoUninitialize();
-	return true;
+    formatType =  vFmtType[deviceID][formats];
+    width = vWidth[deviceID][formats];
+    height = vHeight[deviceID][formats];
+    fps = vFps[deviceID][formats];
+	
+    CoUninitialize();
+    return true;
 }
 
 // ----------------------------------------------------------------------
@@ -1474,9 +1466,9 @@ char videoInput::deviceNames[VI_MAX_CAMERAS][255]={{0}};
 char videoInput::vendorId[VI_MAX_CAMERAS][255]={{0}};
 char videoInput::productId[VI_MAX_CAMERAS][255]={{0}};
 char videoInput::devicePaths[VI_MAX_CAMERAS][255]={{0}};
-long videoInput::vWidth[VI_MAX_CAMERAS][255]={{0}};
-long videoInput::vHeight[VI_MAX_CAMERAS][255]={{0}};
-long videoInput::vFps[VI_MAX_CAMERAS][255]={{0}};
+int videoInput::vWidth[VI_MAX_CAMERAS][255]={{0}};
+int videoInput::vHeight[VI_MAX_CAMERAS][255]={{0}};
+int videoInput::vFps[VI_MAX_CAMERAS][255]={{0}};
 string videoInput::vFmtType[VI_MAX_CAMERAS][255];
 
 char * videoInput::getDeviceName(int deviceID){
@@ -1532,17 +1524,17 @@ int videoInput::listDevices(bool silent){
                     continue;  // Skip this one, maybe the next one will work.
                 }
 
-				VARIANT var;
-				var.vt = VT_BSTR;
-				hr = pPropBag->Read(L"DevicePath", &var, 0);
+		VARIANT var;
+		var.vt = VT_BSTR;
+		hr = pPropBag->Read(L"DevicePath", &var, 0);
 
-				if (FAILED(hr)) hr = pPropBag->Read(L"DeviceInstancePath", &var, 0);
+		if (FAILED(hr)) hr = pPropBag->Read(L"DeviceInstancePath", &var, 0);
 
-				if(SUCCEEDED(hr))
-				{
-					hr = pPropBag->Read(L"DeviceInstancePath", &var, 0);
-					int count = 0;
-					int maxLen = sizeof(devicePaths[0])/sizeof(devicePaths[0][0]) - 2;
+		if(SUCCEEDED(hr))
+		{
+          	    hr = pPropBag->Read(L"DeviceInstancePath", &var, 0);
+   		    int count = 0;
+		    int maxLen = sizeof(devicePaths[0])/sizeof(devicePaths[0][0]) - 2;
                     while( var.bstrVal[count] != 0x00 && count < maxLen) {
                         devicePaths[deviceCounter][count] = (char)var.bstrVal[count];
                         count++;
@@ -1550,31 +1542,31 @@ int videoInput::listDevices(bool silent){
                     devicePaths[deviceCounter][count] = 0;
 
                     if(!silent) DebugPrintOut("SETUP: %i) %s\n",deviceCounter, devicePaths[deviceCounter]);
-				}
+		}
 
-				size_t cSize = strlen(devicePaths[deviceCounter])+1;
-				wchar_t wdevicePaths[MAX_PATH];
-				mbstowcs( wdevicePaths, devicePaths[deviceCounter], cSize);
+		size_t cSize = strlen(devicePaths[deviceCounter])+1;
+		wchar_t wdevicePaths[MAX_PATH];
+		mbstowcs( wdevicePaths, devicePaths[deviceCounter], cSize);
 
-				//Get the vendorId of the device
-				wchar_t *vid_substr;
-				vid_substr = wcsstr(wcslwr(wdevicePaths),L"vid_");
-				if(vid_substr != NULL)
-				{
-					for(int i = 0; i < 4; i++)
-						vendorId[deviceCounter][i] = vid_substr[i+4];
-					vendorId[deviceCounter][5] = '\0';
-				}
+		//Get the vendorId of the device
+		wchar_t *vid_substr;
+		vid_substr = wcsstr(wcslwr(wdevicePaths),L"vid_");
+		if(vid_substr != NULL)
+		{
+		    for(int i = 0; i < 4; i++)
+		    vendorId[deviceCounter][i] = vid_substr[i+4];
+		    vendorId[deviceCounter][5] = '\0';
+		}
 
-				//Get the productId of the device
-				wchar_t *pid_substr;
-				pid_substr = wcsstr(wcslwr(wdevicePaths), L"pid_");
-				if(pid_substr != NULL)
-				{
-					for(int i = 0; i < 4; i++)
-						productId[deviceCounter][i] = pid_substr[i+4];
-					productId[deviceCounter][5] = '\0';
-				}
+		//Get the productId of the device
+		wchar_t *pid_substr;
+		pid_substr = wcsstr(wcslwr(wdevicePaths), L"pid_");
+		if(pid_substr != NULL)
+		{
+		    for(int i = 0; i < 4; i++)
+		        productId[deviceCounter][i] = pid_substr[i+4];
+		    productId[deviceCounter][5] = '\0';
+		}
 
                  // Find the description or friendly name.
                 VARIANT varName;
@@ -1624,11 +1616,11 @@ int videoInput::listDevices(bool silent){
 
 bool videoInput::getDeviceNames(int index, cv::String &deviceName, cv::String &vid, cv::String &pid, cv::String &devicePath)
 {
-	deviceName =  deviceNames[index];
-	vid = vendorId[index];
-	pid = productId[index];
-	devicePath = devicePaths[index];
-	return true;
+    deviceName =  deviceNames[index];
+    vid = vendorId[index];
+    pid = productId[index];
+    devicePath = devicePaths[index];
+    return true;
 }
 
 // ----------------------------------------------------------------------
@@ -1696,7 +1688,7 @@ double videoInput::getFPS(int id) const
 //Included by e-con
 GUID videoInput::getMediasubtype(int deviceID)
 {
-	return VDList[deviceID]->pAmMediaType->subtype;
+    return VDList[deviceID]->pAmMediaType->subtype;
 }
 //Included by e-con - end
 
@@ -1735,20 +1727,20 @@ bool videoInput::getPixels(int id, unsigned char * dstBuffer, bool flipRedAndBlu
             //double paranoia - mutexing with both event and critical section
             EnterCriticalSection(&VDList[id]->sgCallback->critSection);
 
-                unsigned char * src = VDList[id]->sgCallback->pixels;
-                unsigned char * dst = dstBuffer;
-                int height             = VDList[id]->height;
-                int width              = VDList[id]->width;
+            unsigned char * src = VDList[id]->sgCallback->pixels;
+            unsigned char * dst = dstBuffer;
+            int height          = VDList[id]->height;
+            int width           = VDList[id]->width;
 
-                //Added condition based operation by e-con - end
-				if(checkSingleByteFormat(VDList[id]->pAmMediaType->subtype))
-					memcpy(dst, src, width * height);
-				else if(VDList[id]->pAmMediaType->subtype == MEDIASUBTYPE_Y16)
-					memcpy(dst, src, width * height * 2);
-				else
-					processPixels(src, dst, width, height, flipRedAndBlue, flipImage);
-				//Added condition based operation by e-con - end
-                VDList[id]->sgCallback->newFrame = false;
+            //Added condition based operation by e-con - end
+	    if(checkSingleByteFormat(VDList[id]->pAmMediaType->subtype))
+     	        memcpy(dst, src, width * height);
+	    else if(VDList[id]->pAmMediaType->subtype == MEDIASUBTYPE_Y16)
+	        memcpy(dst, src, width * height * 2);
+	    else
+	        processPixels(src, dst, width, height, flipRedAndBlue, flipImage);
+	    //Added condition based operation by e-con - end
+            VDList[id]->sgCallback->newFrame = false;
 
             LeaveCriticalSection(&VDList[id]->sgCallback->critSection);
 
@@ -1767,17 +1759,17 @@ bool videoInput::getPixels(int id, unsigned char * dstBuffer, bool flipRedAndBlu
 
                     unsigned char * src = (unsigned char * )VDList[id]->pBuffer;
                     unsigned char * dst = dstBuffer;
-                    int height             = VDList[id]->height;
-                    int width             = VDList[id]->width;
+                    int height          = VDList[id]->height;
+                    int width           = VDList[id]->width;
 
                     //Added condition based operation by e-con
-					if(checkSingleByteFormat(VDList[id]->pAmMediaType->subtype))
-						memcpy(dst, src, width * height);
-					else if(VDList[id]->pAmMediaType->subtype == MEDIASUBTYPE_Y16)
-						memcpy(dst, src, width * height * 2);
-					else
-						processPixels(src, dst, width, height, flipRedAndBlue, flipImage);
-					//Added condition based operation by e-con - end
+		    if(checkSingleByteFormat(VDList[id]->pAmMediaType->subtype))
+			memcpy(dst, src, width * height);
+		    else if(VDList[id]->pAmMediaType->subtype == MEDIASUBTYPE_Y16)
+			memcpy(dst, src, width * height * 2);
+		    else
+			processPixels(src, dst, width, height, flipRedAndBlue, flipImage);
+		    //Added condition based operation by e-con - end
                     success = true;
                 }else{
                     DebugPrintOut("ERROR: GetPixels() - bufferSizes do not match!\n");
@@ -1924,12 +1916,12 @@ bool videoInput::getVideoSettingFilter(int deviceID, long Property, long &min, l
     }
 
     char propStr[16];
-	getVideoPropertyAsString(Property,propStr);
+    getVideoPropertyAsString(Property,propStr);
 
     DebugPrintOut("Getting video setting %s.\n", propStr);
 
     hr = pAMVideoProcAmp->GetRange(Property, &min, &max, &steppingDelta, &defaultValue, &flags);
-	DebugPrintOut("Range for video setting %s: Min:%ld Max:%ld SteppingDelta:%ld Default:%ld supportedMode:%ld\n", propStr, min, max, steppingDelta, defaultValue, flags);
+    DebugPrintOut("Range for video setting %s: Min:%ld Max:%ld SteppingDelta:%ld Default:%ld supportedMode:%ld\n", propStr, min, max, steppingDelta, defaultValue, flags);
     hr = pAMVideoProcAmp->Get(Property, &currentValue, &flags);
 
     if(pAMVideoProcAmp)pAMVideoProcAmp->Release();
@@ -1968,20 +1960,20 @@ bool videoInput::getVideoSettingsFilter(int deviceID, long Property, long &min, 
     }
 
     char propStr[16];
-	int cvproperty = getVideoPropertyFromCV(Property);	
+    int cvproperty = getVideoPropertyFromCV(Property);	
     getVideoPropertyAsString(cvproperty,propStr);
 
     DebugPrintOut("getting video setting %s.\n", propStr);
 
     hr = pAMVideoProcAmp->GetRange(cvproperty, &min, &max, &steppingDelta, &defaultValue, &supportedMode);
-	if(hr != S_OK)
-	{
-		if(pAMVideoProcAmp)pAMVideoProcAmp->Release();
-		if(VD->pVideoInputFilter)VD->pVideoInputFilter->Release();
-		if(VD->pVideoInputFilter)VD->pVideoInputFilter = NULL;
-		return false;
-	}
-	DebugPrintOut("Range for video setting %s: Min:%ld Max:%ld SteppingDelta:%ld Default:%ld supportedMode:%ld\n", propStr, min, max, steppingDelta, defaultValue, supportedMode);
+    if(hr != S_OK)
+    {
+	if(pAMVideoProcAmp)pAMVideoProcAmp->Release();
+	if(VD->pVideoInputFilter)VD->pVideoInputFilter->Release();
+	if(VD->pVideoInputFilter)VD->pVideoInputFilter = NULL;
+	return false;
+    }
+    DebugPrintOut("Range for video setting %s: Min:%ld Max:%ld SteppingDelta:%ld Default:%ld supportedMode:%ld\n", propStr, min, max, steppingDelta, defaultValue, supportedMode);
     pAMVideoProcAmp->Get(cvproperty, &currentValue, &currentMode);
 
     if(pAMVideoProcAmp)pAMVideoProcAmp->Release();
@@ -1999,7 +1991,7 @@ bool videoInput::setVideoSettingFilterPct(int deviceID, long Property, float pct
 
     long min, max, currentValue, flags, defaultValue, stepAmnt;
 
-	if( !getVideoSettingFilter(deviceID, Property, min, max, stepAmnt, currentValue, flags, defaultValue) )return false;
+    if( !getVideoSettingFilter(deviceID, Property, min, max, stepAmnt, currentValue, flags, defaultValue) )return false;
 
     if(pctValue > 1.0)pctValue = 1.0;
     else if(pctValue < 0)pctValue = 0.0;
@@ -2092,7 +2084,7 @@ bool videoInput::setVideoSettingsFilter(int deviceID, long Property, long lValue
     //bool isSuccessful = false;
 
     char propStr[16];
-	long cvProperty = getVideoPropertyFromCV(Property);
+    long cvProperty = getVideoPropertyFromCV(Property);
     getVideoPropertyAsString(cvProperty,propStr);
 
     videoDevice * VD = VDList[deviceID];
@@ -2337,13 +2329,13 @@ bool videoInput::getVideoSettingsCamera(int deviceID, long Property, long &min, 
     DebugPrintOut("Setting video setting %s.\n", propStr);
 
     hr = pIAMCameraControl->GetRange(cvproperty, &min, &max, &steppingDelta, &defaultValue, &supportedMode);
-	if(hr != S_OK)
-	{
-		if(pIAMCameraControl)pIAMCameraControl->Release();
-		if(VD->pVideoInputFilter)VD->pVideoInputFilter->Release();
+    if(hr != S_OK)
+    {
+	if(pIAMCameraControl)pIAMCameraControl->Release();
+	if(VD->pVideoInputFilter)VD->pVideoInputFilter->Release();
         if(VD->pVideoInputFilter)VD->pVideoInputFilter = NULL;
-		return false;
-	}
+	return false;
+    }
     DebugPrintOut("Range for video setting %s: Min:%ld Max:%ld SteppingDelta:%ld Default:%ld SupportedMode:%ld\n", propStr, min, max, steppingDelta, defaultValue, supportedMode);
     hr = pIAMCameraControl->Get(cvproperty, &currentValue, &currentMode);
 	
@@ -2535,7 +2527,7 @@ void videoInput::setPhyCon(int id, int conn){
 bool videoInput::setup(int deviceNumber){
     devicesFound = getDeviceCount();
 
-     if(deviceNumber>devicesFound-1)
+    if(deviceNumber>devicesFound-1)
     {
         DebugPrintOut("SETUP: device[%i] not found - you have %i devices available\n", deviceNumber, devicesFound);
         if(devicesFound>=0) DebugPrintOut("SETUP: this means that the last device you can use is device[%i]\n",  devicesFound-1);
@@ -2643,13 +2635,13 @@ void videoInput::getMediaSubtypeAsString(GUID type, char * typeAsString){
     else if(type == MEDIASUBTYPE_MJPG)  sprintf(tmpStr, "MJPG");
     else if(type == MEDIASUBTYPE_Y800)  sprintf(tmpStr, "Y800");
     else if(type == MEDIASUBTYPE_Y8)    sprintf(tmpStr, "Y8");
-	else if(type == MEDIASUBTYPE_Y16)    sprintf(tmpStr, "Y16"); 
+    else if(type == MEDIASUBTYPE_Y16)    sprintf(tmpStr, "Y16"); 
     else if(type == MEDIASUBTYPE_GREY)  sprintf(tmpStr, "GREY");
     else if(type == MEDIASUBTYPE_I420)  sprintf(tmpStr, "I420");
-	//Included by e-con
-	else if(type == MEDIASUBTYPE_BY8)  sprintf(tmpStr, "BY8");
-	else if(type == MEDIASUBTYPE_Y16)  sprintf(tmpStr, "Y16");
-	//Included by e-con - end
+    //Included by e-con
+    else if(type == MEDIASUBTYPE_BY8)  sprintf(tmpStr, "BY8");
+    else if(type == MEDIASUBTYPE_Y16)  sprintf(tmpStr, "Y16");
+    //Included by e-con - end
     else sprintf(tmpStr, "OTHER");
 
     memcpy(typeAsString, tmpStr, sizeof(char)*8);
@@ -3800,36 +3792,36 @@ bool VideoCapture_DShow::grabFrame()
 
 bool VideoCapture_DShow::getDevices(int &devices)
 {
-	CoInitialize(0);
-	devices = g_VI.listDevices(true);
-	CoUninitialize();
-	return true;
+    CoInitialize(0);
+    devices = g_VI.listDevices(true);
+    CoUninitialize();
+    return true;
 }
 
 bool VideoCapture_DShow::getDeviceInfo(int index, String &deviceName, String &vid, String &pid, String &devicePath)
 {
-	CoInitialize(0);
-	bDecider = g_VI.getDeviceNames(index, deviceName, vid, pid, devicePath);
-	CoUninitialize();
-	if(!bDecider) return false;
-	return true;
+    CoInitialize(0);
+    bool bDecider = g_VI.getDeviceNames(index, deviceName, vid, pid, devicePath);
+    CoUninitialize();
+    if(!bDecider) return false;
+    return true;
 }
 
 bool VideoCapture_DShow::getFormats(int &formats)
 {
-	return g_VI.getFormats(m_index, formats);
+    return g_VI.getFormats(m_index, formats);
 }
 
 bool VideoCapture_DShow::getFormatType(int formats, String &formatType, int &width, int &height, int &fps)
-{
-	return g_VI.getFormatType(m_index, formats, formatType, width, height, fps);
+{ 
+    return g_VI.getFormatType(m_index, formats, formatType, width, height, fps);
 }
 
 bool VideoCapture_DShow::getVideoProperty(int propIdx, long &min, long &max, long &steppingDelta,long &supportedMode, long &currentValue, long &currentMode, long &defaultValue)
 {
-	switch(propIdx)
-	{
-	case CV_CAP_PROP_BRIGHTNESS:
+    switch(propIdx)
+    {
+    case CV_CAP_PROP_BRIGHTNESS:
     case CV_CAP_PROP_CONTRAST:
     case CV_CAP_PROP_HUE:
     case CV_CAP_PROP_SATURATION:
@@ -3839,25 +3831,25 @@ bool VideoCapture_DShow::getVideoProperty(int propIdx, long &min, long &max, lon
     case CV_CAP_PROP_WHITE_BALANCE_BLUE_U:
     case CV_CAP_PROP_BACKLIGHT:
     case CV_CAP_PROP_GAIN:
-		return g_VI.getVideoSettingsFilter(m_index, propIdx, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
+	return g_VI.getVideoSettingsFilter(m_index, propIdx, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
 
-	case CV_CAP_PROP_PAN:
-	case CV_CAP_PROP_TILT:
-	case CV_CAP_PROP_ROLL:
-	case CV_CAP_PROP_ZOOM:
-	case CV_CAP_PROP_EXPOSURE:
-	case CV_CAP_PROP_IRIS:
-	case CV_CAP_PROP_FOCUS:
-		return g_VI.getVideoSettingsCamera(m_index, propIdx, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
-	}
-	return false;
+    case CV_CAP_PROP_PAN:
+    case CV_CAP_PROP_TILT:
+    case CV_CAP_PROP_ROLL:
+    case CV_CAP_PROP_ZOOM:
+    case CV_CAP_PROP_EXPOSURE:
+    case CV_CAP_PROP_IRIS:
+    case CV_CAP_PROP_FOCUS:
+  	return g_VI.getVideoSettingsCamera(m_index, propIdx, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
+    }
+    return false;
 }
 
 bool VideoCapture_DShow::setVideoProperty(int propIdx, long value, long mode)
 {
-	switch(propIdx)
-	{
-	case CV_CAP_PROP_BRIGHTNESS:
+    switch(propIdx)
+    {
+    case CV_CAP_PROP_BRIGHTNESS:
     case CV_CAP_PROP_CONTRAST:
     case CV_CAP_PROP_HUE:
     case CV_CAP_PROP_SATURATION:
@@ -3867,31 +3859,31 @@ bool VideoCapture_DShow::setVideoProperty(int propIdx, long value, long mode)
     case CV_CAP_PROP_WHITE_BALANCE_BLUE_U:
     case CV_CAP_PROP_BACKLIGHT:
     case CV_CAP_PROP_GAIN:
-		return g_VI.setVideoSettingsFilter(m_index, propIdx, value, mode);
+ 	return g_VI.setVideoSettingsFilter(m_index, propIdx, value, mode);
 
-	case CV_CAP_PROP_PAN:
-	case CV_CAP_PROP_TILT:
-	case CV_CAP_PROP_ROLL:
-	case CV_CAP_PROP_ZOOM:
-	case CV_CAP_PROP_EXPOSURE:
-	case CV_CAP_PROP_IRIS:
-	case CV_CAP_PROP_FOCUS:
-		return g_VI.setVideoSettingsCamera(m_index, propIdx, value, mode);
-	}
-	return false;
+    case CV_CAP_PROP_PAN:
+    case CV_CAP_PROP_TILT:
+    case CV_CAP_PROP_ROLL:
+    case CV_CAP_PROP_ZOOM:
+    case CV_CAP_PROP_EXPOSURE:
+    case CV_CAP_PROP_IRIS:
+    case CV_CAP_PROP_FOCUS:
+   	return g_VI.setVideoSettingsCamera(m_index, propIdx, value, mode);
+    }
+    return false;
 }
 
 bool VideoCapture_DShow::retrieveFrame(int, OutputArray frame)
 {
-	int w = g_VI.getWidth(m_index), h = g_VI.getHeight(m_index);
-	//Included conditional opencv datatype allocation ,as single byte datatype does not need much memory. By e-con
-	if(checkSingleByteFormat(g_VI.getMediasubtype(m_index)))
-		frame.create( Size(w,h), CV_8UC1);
-	else if(g_VI.getMediasubtype(m_index) == MEDIASUBTYPE_Y16)
-		frame.create( Size(w, h), CV_16UC1);
-	else
-		frame.create(Size(w,h), CV_8UC3);
-	//Included conditional opencv datatype allocation by e-con - end
+    int w = g_VI.getWidth(m_index), h = g_VI.getHeight(m_index);
+    //Included conditional opencv datatype allocation ,as single byte datatype does not need much memory. By e-con
+    if(checkSingleByteFormat(g_VI.getMediasubtype(m_index)))
+  	frame.create( Size(w,h), CV_8UC1);
+    else if(g_VI.getMediasubtype(m_index) == MEDIASUBTYPE_Y16)
+	frame.create( Size(w, h), CV_16UC1);
+    else
+	frame.create(Size(w,h), CV_8UC3);
+    //Included conditional opencv datatype allocation by e-con - end
 
     cv::Mat mat = frame.getMat();
     return g_VI.getPixels(m_index, mat.ptr(), false, true );

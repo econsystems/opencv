@@ -65,8 +65,6 @@ using namespace std;
 
 using namespace cv;
 
-bool bDecider;
-
 namespace cv
 {
 
@@ -85,9 +83,9 @@ static inline double icvGetCaptureProperty( const CvCapture* capture, int id )
     return capture ? capture->getProperty(id) : 0;
 }
 
-static inline bool icvGetVideoProperty( CvCapture* capture, int id, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue)
+static inline bool icvGetVideoProperty( CvCapture* capture, int id, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue)
 {
-	return capture ? capture->getProperty(id, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue) : 0;
+    return capture ? capture->getProperty(id, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue) : 0;
 }
 
 CV_IMPL void cvReleaseCapture( CvCapture** pcapture )
@@ -110,17 +108,17 @@ CV_IMPL IplImage* cvQueryFrame( CvCapture* capture )
 
 CV_IMPL bool cvGetFormats( CvCapture* capture, int &formats )
 {
-	return capture ? capture->getFormats(formats) : 0;
+    return capture ? capture->getFormats(formats) : 0;
 }
 
 CV_IMPL bool cvGetFormatType( CvCapture* capture, int formats, String &formatType, int &width, int &height, int &fps)
 {
-	return capture ? capture->getFormatType(formats, formatType, width, height, fps) : 0;
+    return capture ? capture->getFormatType(formats, formatType, width, height, fps) : 0;
 } 
 
 CV_IMPL bool cvSetFormatType( CvCapture* capture, int index)
 {
-	return capture ? capture->setFormatType(index) : 0;
+    return capture ? capture->setFormatType(index) : 0;
 }
 
 CV_IMPL int cvGrabFrame( CvCapture* capture )
@@ -143,9 +141,9 @@ CV_IMPL int cvSetCaptureProperty( CvCapture* capture, int id, double value )
     return capture ? capture->setProperty(id, value) : 0;
 }
 
-CV_IMPL bool cvSetVideoProperty( CvCapture* capture, int id, long value, long mode )
+CV_IMPL bool cvSetVideoProperty( CvCapture* capture, int id, double value, double mode )
 {
-	return capture ? capture->setProperty(id, value, mode) : 0;
+    return capture ? capture->setProperty(id, value, mode) : 0;
 }
 
 CV_IMPL int cvGetCaptureDomain( CvCapture* capture)
@@ -744,70 +742,70 @@ void VideoCapture::release()
 
 bool VideoCapture::getDevices(int &devices)
 {
-	CV_TRACE_FUNCTION();
+    CV_TRACE_FUNCTION();
 #ifdef HAVE_DSHOW
-	VideoCapture_DShow GD;
-	return GD.getDevices(devices);
+    VideoCapture_DShow GD;
+    return GD.getDevices(devices);
 #endif
 #if defined HAVE_LIBV4L || defined HAVE_CAMV4L || defined HAVE_CAMV4L2 || defined HAVE_VIDEOIO
-	cap.reset(cvGetDevices(devices));
-	return true;
+    cap.reset(cvGetDevices(devices));
+    return true;
 #endif
-	return false;
+    return false;
 }
 
 bool VideoCapture::getDeviceInfo(int index, String &deviceName, String &vid, String &pid, String &devicePath)
 {
-	CV_TRACE_FUNCTION();
+    CV_TRACE_FUNCTION();
 #ifdef HAVE_DSHOW
-	VideoCapture_DShow GDI;
-	return GDI.getDeviceInfo(index, deviceName, vid, pid, devicePath);
+    VideoCapture_DShow GDI;
+    return GDI.getDeviceInfo(index, deviceName, vid, pid, devicePath);
 #endif
 #if defined HAVE_LIBV4L || defined HAVE_CAMV4L || defined HAVE_CAMV4L2 || defined HAVE_VIDEOIO
-	cap.reset(cvGetDeviceInfo(index, deviceName, vid, pid, devicePath));
-	return true;
+    cap.reset(cvGetDeviceInfo(index, deviceName, vid, pid, devicePath));
+    return true;
 #endif
-	return false;
+    return false;
 }
 
 bool VideoCapture::getFormats(int &formats)
 {
-	CV_TRACE_FUNCTION();
-	if(!icap.empty())
-		return icap->getFormats(formats);
-	return cvGetFormats(cap, formats);
+    CV_TRACE_FUNCTION();
+    if(!icap.empty())
+        return icap->getFormats(formats);
+    return cvGetFormats(cap, formats);
 }
 
 bool VideoCapture::getFormatType(int formats, String &formatType, int &width, int &height, int &fps)
 {
-	CV_TRACE_FUNCTION();
-	if(!icap.empty())
-		return icap->getFormatType(formats, formatType, width, height, fps);
-	return cvGetFormatType(cap, formats, formatType, width, height, fps);
+    CV_TRACE_FUNCTION();
+    if(!icap.empty())
+	return icap->getFormatType(formats, formatType, width, height, fps);
+    return cvGetFormatType(cap, formats, formatType, width, height, fps);
 }
 
 bool VideoCapture::setFormatType(int index)
 {
-	CV_TRACE_FUNCTION();
-	String formatType;
-	int width, height, fps;
-	if(!icap.empty())
+    CV_TRACE_FUNCTION();
+    String formatType;
+    int width, height, fps;
+    if(!icap.empty())
+    {
+	if(icap->getFormatType(index, formatType, width, height, fps))
 	{
-		if(icap->getFormatType(index, formatType, width, height, fps))
+            if(icap->setProperty(CV_CAP_PROP_FOURCC, index))
+	    {
+		if(icap->setProperty(CV_CAP_PROP_FRAME_WIDTH, width)) 
 		{
-			if(icap->setProperty(CV_CAP_PROP_FOURCC, index))
-			{
-				if(icap->setProperty(CV_CAP_PROP_FRAME_WIDTH, width)) 
-				{
-					if(icap->setProperty(CV_CAP_PROP_FRAME_HEIGHT, height))
-					{
-						return icap->setProperty(CV_CAP_PROP_FPS, fps);
-					}
-				}
-			}
+		    if(icap->setProperty(CV_CAP_PROP_FRAME_HEIGHT, height))
+		    {
+			return icap->setProperty(CV_CAP_PROP_FPS, fps);
+		    }
 		}
+            }
 	}
-	return cvSetFormatType(cap, index);	
+    }
+    return cvSetFormatType(cap, index);	
 }
 
 bool VideoCapture::grab()
@@ -896,12 +894,12 @@ bool VideoCapture::set(int propId, double value)
     return cvSetCaptureProperty(cap, propId, value) != 0;
 }
 
-bool VideoCapture::set(int propId, long value, long mode)
+bool VideoCapture::set(int propId, double value, double mode)
 {
-	CV_TRACE_FUNCTION();
-	if (!icap.empty())
-		return icap->setVideoProperty(propId, value, mode);
-	return cvSetVideoProperty(cap, propId, value, mode) != 0;
+//    CV_TRACE_FUNCTION();
+    if (!icap.empty())
+    	return icap->setVideoProperty(propId, value, mode);
+    return cvSetVideoProperty(cap, propId, value, mode) != 0;
 }
 
 double VideoCapture::get(int propId) const
@@ -911,12 +909,12 @@ double VideoCapture::get(int propId) const
     return icvGetCaptureProperty(cap, propId) != 0;
 }
 
-bool VideoCapture::get(int propId, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue) 
+bool VideoCapture::get(int propId, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue) 
 {
-	CV_TRACE_FUNCTION();
-	if (!icap.empty())
-		return icap->getVideoProperty(propId, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
-	return icvGetVideoProperty(cap, propId, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
+//    CV_TRACE_FUNCTION();
+    if (!icap.empty())
+ 	return icap->getVideoProperty(propId, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
+    return icvGetVideoProperty(cap, propId, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
 }
 
 VideoWriter::VideoWriter()

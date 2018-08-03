@@ -87,16 +87,16 @@ using namespace std;
 
 struct CvCapture
 {
-	CvCapture(){}
+    CvCapture(){}
     virtual ~CvCapture() {}
-	virtual bool getFormats(int &) { return true; }
-	virtual bool getFormatType(int , cv::String &, int &, int &, int &) { return true; }
-	virtual bool setFormatType(int ) { return true; }
+    virtual bool getFormats(int &) { return true; }
+    virtual bool getFormatType(int , cv::String &, int &, int &, int &) { return true; }
+    virtual bool setFormatType(int ) { return true; }
     virtual double getProperty(int) const { return 0; }
-	virtual bool getProperty(int, long &, long &, long &, long &, long &, long &, long &) { return 0; }
+    virtual bool getProperty(int, double &, double &, double &, double &, double &, double &, double &) { return 0; }
 
     virtual bool setProperty(int, double) { return 0; }
-	virtual bool setProperty(int , long, long) { return 0; }
+    virtual bool setProperty(int, double, double) { return 0; }
     virtual bool grabFrame() { return true; }
     virtual IplImage* retrieveFrame(int) { return 0; }
     virtual int getCaptureDomain() { return cv::CAP_ANY; } // Return the type of the capture object: CAP_VFW, etc...
@@ -188,12 +188,12 @@ namespace cv
         virtual bool retrieveFrame(int, OutputArray) = 0;
         virtual bool isOpened() const = 0;
         virtual int getCaptureDomain() { return CAP_ANY; } // Return the type of the capture object: CAP_VFW, etc...
-		virtual bool getDevices(int &) = 0;
-		virtual bool getDeviceInfo(int , String &, String &, String &, String &) = 0;
-		virtual bool getFormats(int &) = 0;
-		virtual bool getFormatType(int , String &, int &, int &, int &) = 0;
-		virtual bool getVideoProperty(int, long &, long &, long &, long &, long &, long &, long &) = 0;
-		virtual bool setVideoProperty(int, long, long) = 0;
+	virtual bool getDevices(int &) = 0;
+	virtual bool getDeviceInfo(int , String &, String &, String &, String &) = 0;
+	virtual bool getFormats(int &) = 0;
+	virtual bool getFormatType(int , String &, int &, int &, int &) = 0;
+	virtual bool getVideoProperty(int, double &, double &, double &, double &, double &, double &, double &) = 0;
+	virtual bool setVideoProperty(int, double, double) = 0;
     };
 
     class IVideoWriter

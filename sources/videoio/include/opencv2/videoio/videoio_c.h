@@ -151,7 +151,7 @@ CVAPI(bool) cvGetFormatType(CvCapture* capture, int formats, cv::String &formatT
 
 CVAPI(bool) cvSetFormatType(CvCapture* capture, int index);
 
-CVAPI(bool) cvSetVideoProperty(CvCapture* capture, int id, long value, long mode);
+CVAPI(bool) cvSetVideoProperty(CvCapture* capture, int id, double value, double mode);
 
 CVAPI(CvCapture*) cvGetDevices(int &devices);
 
@@ -222,7 +222,7 @@ enum
     CV_CAP_PROP_AUTOFOCUS     =39,
     CV_CAP_PROP_SAR_NUM       =40,
     CV_CAP_PROP_SAR_DEN       =41,
-	CV_CAP_PROP_AUTO_WHITE_BALANCE =42,
+    CV_CAP_PROP_AUTO_WHITE_BALANCE =42,
 
     CV_CAP_PROP_AUTOGRAB      =1024, // property for videoio class CvCapture_Android only
     CV_CAP_PROP_SUPPORTED_PREVIEW_SIZES_STRING=1025, // readonly, tricky property, returns cpnst char* indeed

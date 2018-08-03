@@ -11,8 +11,8 @@
 * bool getFormats(int &formats);
 * bool getFormatType(int format, String &formatType, int &width, int &height, int &fps);
 * bool setFormatType(int format)
-* bool get(int propId, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
-* bool set(int propId, long value, long mode);
+* bool get(int propId, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue);
+* bool set(int propId, double value, double mode);
 
 ### APIs Explanation
 
@@ -41,12 +41,12 @@
 * Set the video format, resolution and fps to the device. 
 
 
-#### bool get(int propId, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
+#### bool get(int propId, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue);
 
 * Get specific UVC Property(Brightness, Contrast,...) minimum value, maximum value, current value, default value, steppingDelta, current mode and supported mode.
 
 
-#### bool set(int propId, long value, long mode);
+#### bool set(int propId, double value, double mode);
 
 * Set specific UVC Property(Brightness, Contrast, Hue,...) value and mode.
 

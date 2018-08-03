@@ -23,19 +23,19 @@ namespace cv
 class VideoCapture_DShow : public IVideoCapture
 {
 public:
-	VideoCapture_DShow();
+    VideoCapture_DShow();
     VideoCapture_DShow(int index);
     virtual ~VideoCapture_DShow();
 
     virtual double getProperty(int propIdx) const;
     virtual bool setProperty(int propIdx, double propVal);
 
-	virtual bool getDevices(int &devices);
-	virtual bool getDeviceInfo(int index, String &deviceName, String &vid, String &pid, String &devicePath);
-	virtual bool getFormats(int &formats);
-	virtual bool getFormatType(int formats, String &formatType, int &width, int &height, int &fps);
-	virtual bool getVideoProperty(int propIdx, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
-	virtual bool setVideoProperty(int propIdx, long value, long mode);  
+    virtual bool getDevices(int &devices);
+    virtual bool getDeviceInfo(int index, String &deviceName, String &vid, String &pid, String &devicePath);
+    virtual bool getFormats(int &formats);
+    virtual bool getFormatType(int formats, String &formatType, int &width, int &height, int &fps);
+    virtual bool getVideoProperty(int propIdx, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue);
+    virtual bool setVideoProperty(int propIdx, double value, double mode);  
     virtual bool grabFrame();
     virtual bool retrieveFrame(int outputType, OutputArray frame);
     virtual int getCaptureDomain();
@@ -47,9 +47,6 @@ protected:
     int m_index, m_width, m_height, m_fourcc;
     int m_widthSet, m_heightSet;
     static videoInput g_VI;
-	bool bDecider;
-	HANDLE m_WriteHandle, m_ReadHandle;
-	OVERLAPPED m_lpOverlapped;
 };
 
 }

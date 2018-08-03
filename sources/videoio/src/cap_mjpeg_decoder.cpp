@@ -697,12 +697,12 @@ public:
     virtual bool isOpened() const;
     virtual int getCaptureDomain() { return CAP_ANY; } // Return the type of the capture object: CAP_VFW, etc...
     MotionJpegCapture(const String&); 
-	virtual bool getDevices(int &devices);
-	virtual bool getDeviceInfo(int index, String &deviceName, String &vid, String &pid, String &devicePath);
-	virtual bool getFormats(int &formats);
-	virtual bool getFormatType(int formats, String &formatType, int &width, int &height, int &fps);
-	virtual bool getVideoProperty(int Property, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
-	virtual bool setVideoProperty(int settings, long value, long mode);
+    virtual bool getDevices(int &devices);
+    virtual bool getDeviceInfo(int index, String &deviceName, String &vid, String &pid, String &devicePath);
+    virtual bool getFormats(int &formats);
+    virtual bool getFormatType(int formats, String &formatType, int &width, int &height, int &fps);
+    virtual bool getVideoProperty(int Property, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue);
+    virtual bool setVideoProperty(int settings, double value, double mode);
 
     bool open(const String&);
     void close();
@@ -822,60 +822,60 @@ bool MotionJpegCapture::grabFrame()
 
 bool MotionJpegCapture::getDevices(int &devices)
 {
-	std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
-	devices = 0;
-	return false;
+    std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
+    devices = 0;
+    return false;
 }
 
 bool MotionJpegCapture::getDeviceInfo(int index , String &deviceName, String &vid , String &pid , String &devicePath)
 {
-	std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
-	if(index == 0)
-	{
-		deviceName = "No devices";
-		vid = "No Vid";
-		pid = "No Pid";
-		devicePath = "Not Detected";
-	}
-	return false;
+    std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
+    if(index == 0)
+    {
+   	deviceName = "No devices";
+	vid = "No Vid";
+	pid = "No Pid";
+	devicePath = "Not Detected";
+    }
+    return false;
 }
 
 bool MotionJpegCapture::getFormats(int &formats)
 {
-	std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
-	formats = 0;
-	return false;
+    std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
+    formats = 0;
+    return false;
 }
 
 bool MotionJpegCapture::getFormatType(int formats, String &formatType, int &width, int &height, int &fps)
 {
-	std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
-	if(formats == 0)
-	{
-		formatType = "Not Detected";
-		width = 0;
-		height = 0;
-		fps = 0;
-	}
-	return false;
+    std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
+    if(formats == 0)
+    {
+	formatType = "Not Detected";
+	width = 0;
+	height = 0;
+	fps = 0;
+    }
+    return false;
 }
 
-bool MotionJpegCapture::getVideoProperty(int Property, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue)
+bool MotionJpegCapture::getVideoProperty(int Property, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue)
 {
-	std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
-	if(Property == 0)
-	{
-		min = 0, max = 0, steppingDelta = 0, supportedMode = 0, currentValue = 0, currentMode = 0, defaultValue = 0;
-	}
-	return false;
+    std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
+    if(Property == 0)
+    {
+   	min = 0, max = 0, steppingDelta = 0, supportedMode = 0, currentValue = 0, currentMode = 0, defaultValue = 0;
+    }
+    return false;
 }
 
-bool MotionJpegCapture::setVideoProperty(int settings , long value, long mode)
+bool MotionJpegCapture::setVideoProperty(int settings , double value, double mode)
 {
-	std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
-	if(settings == 0 && value == 0 && mode == 0)
-	{}
-	return false;
+    std::cout << "Currently this API for MotionJpegCapture is not supported" << std::endl;
+    if(settings == 0 && value == 0 && mode == 0)
+    {}
+    return false;
 }
 
 bool MotionJpegCapture::retrieveFrame(int, OutputArray output_frame)
