@@ -92,7 +92,7 @@ bool exploreCam();
 bool bReadSet(int tid, bool bRead)
 {
     std::lock_guard<std::mutex> guard(mu);
-	
+
     if(tid == 1)
     {
         bCapture = bRead;
@@ -103,7 +103,7 @@ bool bReadSet(int tid, bool bRead)
 }
 
 bool bPreviewSet(int tid, bool bPrev)
-{	
+{
     std::lock_guard<std::mutex> guard(mu);
 
     if(tid == 1)
@@ -115,26 +115,26 @@ bool bPreviewSet(int tid, bool bPrev)
     return bPreview;
 }
 
-// Actual Data format BGIRR after conversion BGGR - IR is replaced with the G 
+// Actual Data format BGIRR after conversion BGGR - IR is replaced with the G
 //IR data is collected as a separate image
 bool ConvertRGIR2RGGB(Mat BayerRGIR, Mat &BayerRGGB, Mat &IRimage)
 {
     //Result image after replacing the IR pixel with the G data
     BayerRGGB = BayerRGIR.clone();
-	
+
     //IR data will be half the size of Bayer Image
     IRimage = Mat(BayerRGIR.size() / 2, CV_8UC1);
 
     //copying the IR data and replacing the IR data with G
     for (int Row = 0; Row < BayerRGIR.rows; Row += 2)
     {
-  	for (int Col = 0; Col < BayerRGIR.cols; Col += 2)
-	{
-	    //Set the IR Data with Nearby Green 
-	    BayerRGGB.at<uchar>(Row + 1, Col) = BayerRGIR.at<uchar>(Row, Col + 1);
-	    //Set the IR Data 
-   	    IRimage.at<uchar>(Row / 2, Col / 2) = BayerRGIR.at<uchar>(Row + 1, Col);
-	}
+    	for (int Col = 0; Col < BayerRGIR.cols; Col += 2)
+      	{
+      	    //Set the IR Data with Nearby Green
+      	    BayerRGGB.at<uchar>(Row + 1, Col) = BayerRGIR.at<uchar>(Row, Col + 1);
+      	    //Set the IR Data
+         	    IRimage.at<uchar>(Row / 2, Col / 2) = BayerRGIR.at<uchar>(Row + 1, Col);
+      	}
     }
 
     return true;
@@ -155,42 +155,43 @@ void stream()
             {
                 cap >> Frame;
             }
-		
-            if(!Frame.empty())
-	    {
-	        if((_12CUNIR) || (_CU51))
-		{		
-		    //Convert to 8 Bit: 
-		    //Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
-		    convertScaleAbs(Frame, ResultImage, 0.06226);
-	
-		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-		    imshow("OpenCVCam", ResultImage);
-		}
-		else if(_CU40)
-		{
-		    //Convert to 8 Bit: 
-		    //Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
-		    convertScaleAbs(Frame, BayerFrame8, 0.249023);
-	
-		    //Filling the missing G -channel bayer data
-   		    ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
-			
-   		    //Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
-		    cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
 
-		    namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
-		    imshow("OpenCVCam BGR Frame", BGRImage);
-	
-		    namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
-		    imshow("OpenCVCam IR Frame", IRImage);
-		}
-		else
-		{
-		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-		    imshow("OpenCVCam", Frame);
-		}
-	    }
+            if(!Frame.empty())
+	          {
+        	        if((_12CUNIR) || (_CU51))
+              		{
+              		    //Convert to 8 Bit:
+              		    //Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
+              		    convertScaleAbs(Frame, ResultImage, 0.06226);
+
+              		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+              		    imshow("OpenCVCam", ResultImage);
+              		}
+              		else if(_CU40)
+              		{
+              		    //Convert to 8 Bit:
+              		    //Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
+              		    convertScaleAbs(Frame, BayerFrame8, 0.249023);
+
+              		    //Filling the missing G -channel bayer data
+                 		    ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
+
+                 		    //Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
+              		    cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+
+              		    namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
+              		    imshow("OpenCVCam BGR Frame", BGRImage);
+
+              		    namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
+              		    imshow("OpenCVCam IR Frame", IRImage);
+              		}
+              		else
+              		{
+              		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+              		    imshow("OpenCVCam", Frame);
+              		}
+	          }
+
             keyPressed = waitKey(10);
 
             while(bSwitch)
@@ -223,48 +224,50 @@ void *preview(void *arg)
             {
                 cap >> Frame;
             }
-			
- 	    if(!Frame.empty())
-	    {
-		if((_12CUNIR) || (_CU51))
-		{		
-	            //Convert to 8 Bit: 
-		    //Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
-		    convertScaleAbs(Frame, ResultImage, 0.06226);
 
-		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-		    imshow("OpenCVCam", ResultImage);
-		}
-		else if(_CU40)
-		{
-		    //Convert to 8 Bit: 
-		    //Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
-		    convertScaleAbs(Frame, BayerFrame8, 0.249023);
+       	    if(!Frame.empty())
+      	    {
+                		if((_12CUNIR) || (_CU51))
+                		{
+                	      //Convert to 8 Bit:
+                		    //Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
+                		    convertScaleAbs(Frame, ResultImage, 0.06226);
 
-		    //Filling the missing G -channel bayer data
-		    ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
-			
-		    //Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
-		    cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+                		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+                		    imshow("OpenCVCam", ResultImage);
+                		}
+                		else if(_CU40)
+                		{
+                		    //Convert to 8 Bit:
+                		    //Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
+                		    convertScaleAbs(Frame, BayerFrame8, 0.249023);
 
-		    namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
-		    imshow("OpenCVCam BGR Frame", BGRImage);	
-	
-		    namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
-		    imshow("OpenCVCam IR Frame", IRImage);
-		}
-		else if(_10CUG_C) //10CUG and other camera's
-		{
-		    cvtColor(Frame, BGRImage, COLOR_BayerGB2BGR);
-		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-		    imshow("OpenCVCam", BGRImage);
-		}
-    	        else
-		{
-		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-		    imshow("OpenCVCam", Frame);
-		}
-	    }
+                		    //Filling the missing G -channel bayer data
+                		    ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
+
+                		    //Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
+                		    cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+
+                		    namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
+                		    imshow("OpenCVCam BGR Frame", BGRImage);
+
+                		    namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
+                		    imshow("OpenCVCam IR Frame", IRImage);
+                		}
+                		else if(_10CUG_C) //10CUG and other camera's
+                		{
+                		    cvtColor(Frame, BGRImage, COLOR_BayerGB2BGR);
+                		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+                		    imshow("OpenCVCam", BGRImage);
+                		}
+                    else
+                		{
+                		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+                		    imshow("OpenCVCam", Frame);
+                		}
+      	    }
+
+
             keyPressed = waitKey(5);
 
             while(bSwitch)
@@ -288,8 +291,8 @@ int main()
     hinstLib = LoadLibrary(L"eCAMFwSw.dll");
     if(hinstLib == NULL)
     {
-  	cout << "The eCAMFwSw.dll is not loaded properly" <<  endl;
-	return 0;
+    	 cout << "The eCAMFwSw.dll is not loaded properly" <<  endl;
+  	   return 0;
     }
 
     readfirmwareversion = (Readfirmwareversion_t) GetProcAddress(hinstLib, "ReadFirmwareVersion");
@@ -301,10 +304,10 @@ int main()
     //Open a Camera Device
     if(!(listDevices()))
     {
-	cout << endl << "List Devices Information Failed" << endl;
+	      cout << endl << "List Devices Information Failed" << endl;
         cout << endl << '\t' << "Press Any key to exit the Application: " << '\t';
 #ifdef _WIN32
-	_getch();
+	      _getch();
 #endif
         return 0;
     }
@@ -317,17 +320,17 @@ int main()
 
     if(!(exploreCam()))
     {
-	cout << endl << "Camera Exploration Failed" << endl;
-	return 0;
+      	cout << endl << "Camera Exploration Failed" << endl;
+      	return 0;
     }
-	
+
 #ifdef _WIN32
     t.detach();
 #endif
-	
+
     if(cap.isOpened())
     {
-	cap.release();
+	       cap.release();
     }
 
     return 0;
@@ -342,7 +345,7 @@ bool listDevices()
     //List total Number of Devices
 #ifdef __linux__
     bSwitch = true;
-#endif	
+#endif
     bSwitch = true;
     if(!(cap.getDevices(devices)))
     {
@@ -363,14 +366,14 @@ bool listDevices()
     //List the Camera Names
     for(int eachDevice = 0; eachDevice < devices; eachDevice++)
     {
-	if(!(cap.getDeviceInfo(eachDevice, deviceName, vid, pid, devicePath)))
-	{
-	    cout << endl << "Device " << eachDevice << " Information couldn't be Retrieved" << endl;
-	}
+      	if(!(cap.getDeviceInfo(eachDevice, deviceName, vid, pid, devicePath)))
+      	{
+      	    cout << endl << "Device " << eachDevice << " Information couldn't be Retrieved" << endl;
+      	}
 
-	cout << '\t' << eachDevice+1 << " . " << deviceName << endl;
-        /*cout << '\t' << eachDevice+1 << " . " << vid << endl; 
-        cout << '\t' << eachDevice+1 << " . " << pid << endl; 
+	      cout << '\t' << eachDevice+1 << " . " << deviceName << endl;
+        /*cout << '\t' << eachDevice+1 << " . " << vid << endl;
+        cout << '\t' << eachDevice+1 << " . " << pid << endl;
         cout << '\t' << eachDevice+1 << " . " << devicePath << endl;*/
     }
 
@@ -390,10 +393,10 @@ bool listDevices()
 
         if(deinitextensionunit())
     	    if(bDetach)
-	        t.detach();
+	         t.detach();
         bSwitch = true;
-	if(cap.isOpened())
-	    cap.release();
+      	if(cap.isOpened())
+      	    cap.release();
 
 #elif __linux__
 
@@ -401,45 +404,45 @@ bool listDevices()
        	if(closeHID())
     	    destroyAllWindows();
 
-#endif	
+#endif
 
     	exit(0);
-	break;	
+	break;
 
     default:
         bPreviewSet(1, false);
-	cap.getDeviceInfo((camId-1), deviceName, vid, pid, devicePath);
-	if((vid == "2560") && (pid == "c140"))
-	{
-	    _CU40 = true;
-            _CU51 = false;
-	    _12CUNIR = false;
-	    _10CUG_C = false;
-	}
-	else if((vid == "2560") && (pid == "c152"))
-	{
-	    _CU40 = false;
-	    _CU51 = true;
-	    _12CUNIR = false;
-	    _10CUG_C = false;
-	}
-	else if((vid == "2560") && (pid == "c113"))
-	{
-	    _CU40 = false;
-	    _CU51 = false;
-	    _12CUNIR = true;
-	    _10CUG_C = false;
-	}
-	else if((vid == "2560") && (pid == "c111"))
-	{
-	    _CU40 = false;
-	    _CU51 = false;
-	    _12CUNIR = false;
-	    _10CUG_C = true;
-	}
+      	cap.getDeviceInfo((camId-1), deviceName, vid, pid, devicePath);
+      	if((vid == "2560") && (pid == "c140"))
+      	{
+      	    _CU40 = true;
+                  _CU51 = false;
+      	    _12CUNIR = false;
+      	    _10CUG_C = false;
+      	}
+      	else if((vid == "2560") && (pid == "c152"))
+      	{
+      	    _CU40 = false;
+      	    _CU51 = true;
+      	    _12CUNIR = false;
+      	    _10CUG_C = false;
+      	}
+      	else if((vid == "2560") && (pid == "c113"))
+      	{
+      	    _CU40 = false;
+      	    _CU51 = false;
+      	    _12CUNIR = true;
+      	    _10CUG_C = false;
+      	}
+      	else if((vid == "2560") && (pid == "c111"))
+      	{
+      	    _CU40 = false;
+      	    _CU51 = false;
+      	    _12CUNIR = false;
+      	    _10CUG_C = true;
+      	}
 
-	if(cap.isOpened())
-	    cap.release();
+      	if(cap.isOpened())
+      	    cap.release();
 
 #ifdef __linux__
 	struct udev *udev;
@@ -447,9 +450,9 @@ bool listDevices()
 	struct udev_list_entry *devices, *dev_list_entry;
 	struct udev_device *dev;
 	udev = udev_new();
-	if (!udev) 
+	if (!udev)
 	{
-       	    printf("Can't create udev\n");
+      printf("Can't create udev\n");
 	    exit(1);
 	}
 	int camdevices = 0, indexId;
@@ -457,40 +460,40 @@ bool listDevices()
 	udev_enumerate_add_match_subsystem(enumerate, "video4linux");
     	udev_enumerate_scan_devices(enumerate);
 	devices = udev_enumerate_get_list_entry(enumerate);
-	udev_list_entry_foreach(dev_list_entry, devices) 
+	udev_list_entry_foreach(dev_list_entry, devices)
 	{
-	    const char *pathvid;	
+	    const char *pathvid;
 	    pathvid = udev_list_entry_get_name(dev_list_entry);
 	    dev = udev_device_new_from_syspath(udev, pathvid);
 	    const char *pathvalue = udev_device_get_devnode(dev);
 	    indexId = pathvalue[10] - '0';
 	    udev_device_unref(dev);
-	    camdevices++;	
+	    camdevices++;
 	    if(camdevices == camId)
 	        break;
-        }
-        udev_enumerate_unref(enumerate);
+      }
+      udev_enumerate_unref(enumerate);
 
-        udev_unref(udev);
+      udev_unref(udev);
 
 #endif
 
 #ifdef _WIN32
         if(cap.open(camId - 1))
 #elif __linux__
-	if(cap.open(indexId))
+	      if(cap.open(indexId))
 #endif
-    	{
-    	    if(!cap.isOpened())
-	    {
-    	        cout << endl << "\t Camera Device not Initialised Successfully \n\n Press any Key to exit the application\n" ;
-                return 0;
-	    }
-    	}
-	if((vid == "2560") && (pid == "c140") || (pid == "c152") || (pid == "c113") || (pid == "c111"))
-	{	
-	    cap.set(CV_CAP_PROP_CONVERT_RGB, false);
-	}
+      	{
+      	    if(!cap.isOpened())
+      	    {
+          	        cout << endl << "\t Camera Device not Initialised Successfully \n\n Press any Key to exit the application\n" ;
+                      return 0;
+      	    }
+      	}
+      	if((vid == "2560") && (pid == "c140") || (pid == "c152") || (pid == "c113") || (pid == "c111"))
+      	{
+      	    cap.set(CV_CAP_PROP_CONVERT_RGB, false);
+      	}
 
 #ifdef _WIN32
 
@@ -501,28 +504,28 @@ bool listDevices()
 #elif __linux__
 
 	udev = udev_new();
-	if (!udev) 
+	if (!udev)
 	{
 	    printf("Can't create udev\n");
 	}
-	
+
 	enumerate = udev_enumerate_new(udev);
 	udev_enumerate_add_match_subsystem(enumerate, "hidraw");
 	udev_enumerate_scan_devices(enumerate);
 	devices = udev_enumerate_get_list_entry(enumerate);
 
-	udev_list_entry_foreach(dev_list_entry, devices) 
+	udev_list_entry_foreach(dev_list_entry, devices)
 	{
 	    const char *path;
 	    String hidPath, VID, PID;
-		
+
 	    path = udev_list_entry_get_name(dev_list_entry);
 	    dev = udev_device_new_from_syspath(udev, path);
 
 	    //HID Device Path
 	    hidPath = udev_device_get_devnode(dev);
 	    dev = udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_device");
-	    if (!dev) 
+	    if (!dev)
 	    {
 	        printf("Unable to find parent usb device.");
 	    }
@@ -537,7 +540,7 @@ bool listDevices()
 	}
 
 	udev_enumerate_unref(enumerate);
-	udev_unref(udev);  
+	udev_unref(udev);
 
 	if(hid_fd > 0)
 	    closeHID();
@@ -564,15 +567,15 @@ bool listDevices()
 bool configFormats()
 {
     while((dilemma == 'y') || (dilemma == 'Y'))
-    {	
+    {
 	int index = -1;
-	
+
 	if(!(cap.getFormats(formats)))
 	{
 	    cout << endl << "Get Total number of Formats Failed" << endl;
 	    return false;
 	}
-		
+
 	cout << endl << "Total Number of Formats Supported by the Camera:  " << '\t' << formats << endl;
 
         cout << '\t' << "0 - Exit" << endl;
@@ -599,7 +602,7 @@ bool configFormats()
 	    {
 	    }
         }
-		
+
 	switch(index)
 	{
 	case EXIT:
@@ -654,7 +657,7 @@ bool setVidProp(int Property, string PropStr)
     while((dilemma == 'y') || (dilemma == 'Y'))
     {
         int mode = 0;
-		
+
         if(!(cap.get(Property, minimum, maximum, steppingDelta, supportedMode, currentValue, currentMode, defaultValue)))
         {
             cout << endl << PropStr << " Properties Couldn't be Retrieved for the Camera Connected" << endl;
@@ -688,25 +691,25 @@ bool setVidProp(int Property, string PropStr)
             cout << "Only Manual " << PropStr << " is Supported by the Camera, User can't set the Mode " << endl << endl;
             mode = MANUAL;
             break;
-		
+
         case AUTOANDMANUAL:
             while((mode <= 0) || (mode > 2))
             {
                 printf("\n Enter a Valid mode to get selected: 1. Auto 2. Manual \n");
                 scanf("%d", &mode);
                 while(getchar() != '\n' && getchar() != EOF)
-                {	
+                {
                 }
             }
             break;
         }
-	
+
         while(mode == MANUAL)
         {
             cout << endl << "Enter a Valid value to Set " << PropStr << " : " << '\t';
             scanf("%lf", &value);
             while(getchar() != '\n' && getchar() != EOF)
-            {	
+            {
             }
             if( (value >= minimum) && (value <= maximum) && ((((long)value)%((long)steppingDelta)) == 0))
             {
@@ -750,7 +753,7 @@ bool configUVCSettings()
     string vidStr[PROPERTY] = {"Exit", "Back", "Main Menu", "Brightness", "Contrast", "Saturation", "Hue", "Gain", "Exposure", "White Balance", "Sharpness", "Gamma", "Zoom", "Focus", "Backlight", "Pan", "Tilt", "Roll", "Iris"};
 
 #elif __linux__
-	
+
     int vid[PROPERTY] = {EXIT, 1, 2, CV_CAP_PROP_BRIGHTNESS, CV_CAP_PROP_CONTRAST, CV_CAP_PROP_SATURATION, CV_CAP_PROP_HUE, CV_CAP_PROP_GAIN, CV_CAP_PROP_EXPOSURE, CV_CAP_PROP_WHITE_BALANCE_BLUE_U, CV_CAP_PROP_SHARPNESS, CV_CAP_PROP_GAMMA, CV_CAP_PROP_ZOOM, CV_CAP_PROP_FOCUS, CV_CAP_PROP_BACKLIGHT, CV_CAP_PROP_PAN, CV_CAP_PROP_TILT};
     string vidStr[PROPERTY] = {"Exit", "Back", "Main Menu", "Brightness", "Contrast", "Saturation", "Hue", "Gain", "Exposure", "White Balance", "Sharpness", "Gamma", "Zoom", "Focus", "Backlight", "Pan", "Tilt"};
 
@@ -772,7 +775,7 @@ bool configUVCSettings()
                     settings++;
                 }
                 continue;
-	    }			
+	    }
 	    uvcProperty.push_back(make_pair(vid[eachVideoSetting], vidStr[eachVideoSetting]));
             cout << '\t' << settings << " - " << vidStr[eachVideoSetting] << endl;
             settings++;
@@ -783,7 +786,7 @@ bool configUVCSettings()
 	    printf("\n Pick a Choice to Configure UVC Settings : \t");
 	    scanf("%d", &choice);
 	    while(getchar() != '\n' && getchar() != EOF)
-	    {	
+	    {
 	    }
         }
 
@@ -806,10 +809,10 @@ bool configUVCSettings()
 	    if(closeHID())
 	        destroyAllWindows();
 
-#endif		
+#endif
 
 	    exit(0);
-	
+
  	case 1:
 	case 2:
 	    if(!(exploreCam()))
@@ -819,7 +822,7 @@ bool configUVCSettings()
             }
             cout << endl << "Camera Exploration is done" << endl;
             break;
-		
+
 	case CV_CAP_PROP_BRIGHTNESS:
 	case CV_CAP_PROP_CONTRAST:
         case CV_CAP_PROP_HUE:
@@ -859,18 +862,19 @@ bool captureStill()
     memset(buf, 0, 240);
     memset(buf1, 0, 240);
     time_t t = time(0);
+    Mat stillFrame;
 #ifdef _WIN32
-	
+
     struct tm tm;
     localtime_s(&tm, &t);
-	
+
     if(_CU40)
     {
-	num = sprintf_s(buf, "OpenCVCamBGR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
-	num = sprintf_s(buf1, "OpenCVCamIR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    	num = sprintf_s(buf, "OpenCVCamBGR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    	num = sprintf_s(buf1, "OpenCVCamIR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
     }
     else
-	num = sprintf_s(buf, "OpenCVCam%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	    num = sprintf_s(buf, "OpenCVCam%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 #elif __linux__
 
@@ -881,49 +885,49 @@ bool captureStill()
     getcwd(cwd, sizeof(cwd));
 
     if(_CU40)
-    {	
+    {
         sprintf(buf, "%s/OpenCVCamBGR%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
-	sprintf(buf1, "%s/OpenCVCamIR%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+        sprintf(buf1, "%s/OpenCVCamIR%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
     }
     else
-	sprintf(buf, "%s/OpenCVCam%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+	      sprintf(buf, "%s/OpenCVCam%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
 #endif
-    if(cap.read(Frame))
+    if(cap.read(stillFrame))
     {
-	if(!Frame.empty())
-	{
- 	    if((_12CUNIR) || (_CU51))
-	    {		
-		//Convert to 8 Bit: 
-		//Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
-		convertScaleAbs(Frame, ResultImage, 0.06226);
-		imwrite(buf, ResultImage);
-	    }
-	    else if(_CU40)
-	    {
-		//Convert to 8 Bit: 
-		//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
-		convertScaleAbs(Frame, BayerFrame8, 0.249023);
-	
-		//Filling the missing G -channel bayer data
-		bPreviewSet(1, false);
-		ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
-		bPreviewSet(1, true);
-			
-		//Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
-		cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+      	if(!stillFrame.empty())
+      	{
+         	    if((_12CUNIR) || (_CU51))
+        	    {
+              		//Convert to 8 Bit:
+              		//Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
+              		convertScaleAbs(stillFrame, ResultImage, 0.06226);
+              		imwrite(buf, ResultImage);
+        	    }
+        	    else if(_CU40)
+        	    {
+              		//Convert to 8 Bit:
+              		//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
+              		convertScaleAbs(stillFrame, BayerFrame8, 0.249023);
 
-		imwrite(buf, BGRImage);		
-		imwrite(buf1, IRImage);		
-		cout << endl << '\t' << buf1 << " image is saved " << endl;
-	    }
-	    else
-	    {
-		imwrite(buf, Frame);
-	    }
-	    cout << endl << '\t' << buf << " image is saved " << endl << endl;
-	}
+              		//Filling the missing G -channel bayer data
+              		bPreviewSet(1, false);
+              		ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
+              		bPreviewSet(1, true);
+
+              		//Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
+              		cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+
+              		imwrite(buf, BGRImage);
+              		imwrite(buf1, IRImage);
+              		cout << endl << '\t' << buf1 << " image is saved " << endl;
+        	    }
+        	    else
+        	    {
+        		      imwrite(buf, stillFrame);
+        	    }
+        	    cout << endl << '\t' << buf << " image is saved " << endl << endl;
+      	}
     }
 
     memset(buf, 0, 240);
@@ -954,8 +958,8 @@ bool configExtUVCSettings()
 
     if(ret < 0)
     {
-	cout << endl << "Writing Data to the UVC Extension is Failed" << endl;
-	return false;
+      	cout << endl << "Writing Data to the UVC Extension is Failed" << endl;
+      	return false;
     }
 
     //Reads Data From the Device
@@ -970,7 +974,7 @@ bool configExtUVCSettings()
     FD_ZERO(&rfds);
     FD_SET(hid_fd, &rfds);
 
-    //Wait up to 1 seconds. 
+    //Wait up to 1 seconds.
     tv.tv_sec = 1;
     tv.tv_usec = 0;
 
@@ -999,24 +1003,24 @@ bool configExtUVCSettings()
     SVN_VER = (outputBuffer[5] << 8)+outputBuffer[6];
     pMajorVersion = outputBuffer[1];
     pMinorVersion1 = outputBuffer[2];
-	
+
     pMinorVersion2 = SDK_VER;
     pMinorVersion3 = SVN_VER;
 
 #elif _WIN32
- 
+
     UINT8 pMajorVersion = 0;
     UINT8 pMinorVersion1 = 0;
     UINT16 pMinorVersion2 = 0;
-    UINT16 pMinorVersion3 = 0;						
+    UINT16 pMinorVersion3 = 0;
 
     BOOL result = readfirmwareversion(&pMajorVersion, &pMinorVersion1, &pMinorVersion2, &pMinorVersion3);
     if(!result)
     {
-	cout << endl << "Reading Data from the UVC Extension is Failed" << endl;
-	return false;
+      	cout << endl << "Reading Data from the UVC Extension is Failed" << endl;
+      	return false;
     }
-	
+
 #endif
 
     printf("\nFirmWareVersion Number = %d.%d.%d.%d \n\n" , pMajorVersion, pMinorVersion1, pMinorVersion2, pMinorVersion3);
@@ -1031,31 +1035,31 @@ bool hidProp()
 {
     while(true)
     {
-	int choice  = -1;
-	cout << endl << '\t' << "0 - Exit" << endl;
+      	int choice  = -1;
+      	cout << endl << '\t' << "0 - Exit" << endl;
         cout << '\t' << "1 - Back" << endl;
         cout << '\t' << "2 - Main Menu" << endl;
         cout << '\t' << "3 - GetFirmware Version Number" << endl;
 
         while((choice < 0) || (choice > 3))
         {
-	    printf("\n Pick a Relevant Choice to Configure Particular Camera Properties: \t");
-	    scanf("%d", &choice);
-	    while(getchar() != '\n' && getchar() != EOF)
-	    {	
-	    }
+      	    printf("\n Pick a Relevant Choice to Configure Particular Camera Properties: \t");
+      	    scanf("%d", &choice);
+      	    while(getchar() != '\n' && getchar() != EOF)
+      	    {
+      	    }
         }
-		
+
 	switch(choice)
 	{
 	case EXIT:
 #ifdef _WIN32
 
 	    if(deinitextensionunit())
-		t.detach();
+		    t.detach();
 	    bSwitch = true;
 	    if(cap.isOpened())
-	 	cap.release();
+	 	    cap.release();
 
 #elif __linux__
 
@@ -1063,24 +1067,24 @@ bool hidProp()
 	    if(closeHID())
                 destroyAllWindows();
 
-#endif			
+#endif
 
-	    exit(0);		
+	    exit(0);
 
 	case 1:
 	case 2:
 	    if(!(exploreCam()))
-		cout << "Camera Exploration is Failed" << endl;
+		      cout << "Camera Exploration is Failed" << endl;
 	    break;
-		
+
 	case 3:
 	    if(!configExtUVCSettings())
-            {
-                cout << endl << "Extension UVC Settings Configuration is Failed" << endl;
-                return false;
-            }
-            cout << endl << "Extension UVC Settings Configuration is Done" << endl;
-            break;
+      {
+          cout << endl << "Extension UVC Settings Configuration is Failed" << endl;
+          return false;
+      }
+      cout << endl << "Extension UVC Settings Configuration is Done" << endl;
+      break;
 	}
     }
 
@@ -1100,7 +1104,7 @@ bool exploreCam()
         cout << '\t' << "2 - Configure Camera Format/Resolution" << endl;
         cout << '\t' << "3 - Configure UVC Settings" << endl;
         cout << '\t' << "4 - Capture Still Images" << endl;
-		
+
         if(bOpenHID)
         {
             cout << '\t' << "5 - HID Properties" << endl;
@@ -1109,7 +1113,7 @@ bool exploreCam()
                 printf("\n Pick a Relevant Choice to Configure Particular Camera Properties : \t");
                 scanf( "%d", &choice);
                 while(getchar() != '\n' && getchar() != EOF)
-                {	
+                {
                 }
             }
         }
@@ -1120,7 +1124,7 @@ bool exploreCam()
                 printf("\n Pick a Relevant Choice to Configure Particular Camera Properties : \t");
                 scanf( "%d", &choice);
                 while(getchar() != '\n' && getchar() != EOF)
-                {	
+                {
                 }
             }
         }
@@ -1135,7 +1139,7 @@ bool exploreCam()
             bSwitch = true;
             if(cap.isOpened())
                 cap.release();
-			
+
 #elif __linux__
 
             bPreviewSet(1, false);
@@ -1144,7 +1148,7 @@ bool exploreCam()
 
 #endif
 
-            exit(0);			
+            exit(0);
 
 		case 1:
             if(!listDevices())
@@ -1192,6 +1196,6 @@ bool exploreCam()
             break;
         }
     }
-	
+
     return true;
 }
