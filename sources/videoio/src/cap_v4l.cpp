@@ -2314,13 +2314,23 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, double val
 
 	if(property_id == CV_CAP_PROP_EXPOSURE)
 	{
+		
+		// Set Exposure mode as manual
+        control.id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
+	    control.value = 1; // 0 - auto mode , 1- manual mode
+		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
+		{
+			perror ("VIDIOC_S_CTRL");
+			return false;
+		}
+			
 	    control.id = capPropertyToV4L2(CV_CAP_PROP_EXPOSURE);
 	    control.value = V4L2_EXPOSURE_MANUAL;
-            if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
-            {
-                perror ("VIDIOC_S_CTRL");
-                return false;
-            }
+		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
+		{
+			perror ("VIDIOC_S_CTRL");
+			return false;
+		}
 	}
 
 	v4l2id = capPropertyToV4L2(property_id);
