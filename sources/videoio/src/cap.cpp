@@ -83,7 +83,7 @@ static inline double icvGetCaptureProperty( const CvCapture* capture, int id )
     return capture ? capture->getProperty(id) : 0;
 }
 
-static inline bool icvGetVideoProperty( CvCapture* capture, int id, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue)
+static inline bool icvGetVideoProperty( CvCapture* capture, int id, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue)
 {
     return capture ? capture->getProperty(id, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue) : 0;
 }
@@ -136,12 +136,12 @@ CV_IMPL double cvGetCaptureProperty( CvCapture* capture, int id )
     return icvGetCaptureProperty(capture, id);
 }
 
-CV_IMPL int cvSetCaptureProperty( CvCapture* capture, int id, double value )
+CV_IMPL int cvSetCaptureProperty( CvCapture* capture, int id, long value )
 {
     return capture ? capture->setProperty(id, value) : 0;
 }
 
-CV_IMPL bool cvSetVideoProperty( CvCapture* capture, int id, double value, double mode )
+CV_IMPL bool cvSetVideoProperty( CvCapture* capture, int id, long value, long mode )
 {
     return capture ? capture->setProperty(id, value, mode) : 0;
 }
@@ -445,7 +445,7 @@ CV_IMPL CvCapture * cvCreateFileCapture (const char * filename)
  * API that can write a given stream.
  */
 static CvVideoWriter* cvCreateVideoWriterWithPreference(const char* filename, int apiPreference, int fourcc,
-                                            double fps, CvSize frameSize, int is_color )
+                                            long fps, CvSize frameSize, int is_color )
 {
     CV_UNUSED(frameSize);
     CV_UNUSED(is_color);
@@ -501,7 +501,7 @@ static CvVideoWriter* cvCreateVideoWriterWithPreference(const char* filename, in
 }
 
 CV_IMPL CvVideoWriter* cvCreateVideoWriter( const char* filename, int fourcc,
-                                            double fps, CvSize frameSize, int is_color )
+                                            long fps, CvSize frameSize, int is_color )
 {
     return cvCreateVideoWriterWithPreference(filename, CAP_ANY, fourcc, fps, frameSize, is_color);
 }
@@ -525,7 +525,8 @@ namespace cv
 
 static Ptr<IVideoCapture> IVideoCapture_create(int index)
 {
-    int  domains[] =
+
+    int  domains[]
     {
 #ifdef HAVE_DSHOW
         CAP_DSHOW,
@@ -640,7 +641,7 @@ static Ptr<IVideoCapture> IVideoCapture_create(const String& filename)
     return Ptr<IVideoCapture>();
 }
 
-static Ptr<IVideoWriter> IVideoWriter_create(const String& filename, int apiPreference, int _fourcc, double fps, Size frameSize, bool isColor)
+static Ptr<IVideoWriter> IVideoWriter_create(const String& filename, int apiPreference, int _fourcc, long fps, Size frameSize, bool isColor)
 {
     Ptr<IVideoWriter> iwriter;
 #ifdef HAVE_MFX
@@ -710,7 +711,7 @@ bool VideoCapture::open(const String& filename)
 
 bool VideoCapture::open(int index)
 {
-    CV_TRACE_FUNCTION();
+	CV_TRACE_FUNCTION();
 
     if (isOpened()) release();
 	//g_i = 0;
@@ -791,20 +792,22 @@ bool VideoCapture::setFormatType(int index)
     int width, height, fps;
     if(!icap.empty())
     {
-	if(icap->getFormatType(index, formatType, width, height, fps))
-	{
-            if(icap->setProperty(CV_CAP_PROP_FOURCC, index))
-	    {
-		if(icap->setProperty(CV_CAP_PROP_FRAME_WIDTH, width)) 
+		if (icap->getFormatType(index, formatType, width, height, fps))
 		{
-		    if(icap->setProperty(CV_CAP_PROP_FRAME_HEIGHT, height))
-		    {
-			return icap->setProperty(CV_CAP_PROP_FPS, fps);
-		    }
+			if (icap->setProperty(CV_CAP_PROP_FOURCC, index))
+			{
+				if (icap->setProperty(CV_CAP_PROP_FRAME_WIDTH, width))
+				{
+					if (icap->setProperty(CV_CAP_PROP_FRAME_HEIGHT, height))
+					{
+						return icap->setProperty(CV_CAP_PROP_FPS, fps);
+					}
+				}
+			}
 		}
-            }
+            
 	}
-    }
+    
     return cvSetFormatType(cap, index);	
 }
 
@@ -861,7 +864,7 @@ VideoCapture& VideoCapture::operator >> (Mat& image)
             std::lock_guard<std::mutex> lock(VideoioBridge::getInstance().inputBufferMutex);
             VideoioBridge& bridge = VideoioBridge::getInstance();
 
-            // double buffering
+            // long buffering
             bridge.swapInputBuffers();
             auto p = bridge.frontInputPtr;
 
@@ -887,14 +890,14 @@ VideoCapture& VideoCapture::operator >> (UMat& image)
     return *this;
 }
 
-bool VideoCapture::set(int propId, double value)
+bool VideoCapture::set(int propId, long value)
 {
     if (!icap.empty())
         return icap->setProperty(propId, value);
     return cvSetCaptureProperty(cap, propId, value) != 0;
 }
 
-bool VideoCapture::set(int propId, double value, double mode)
+bool VideoCapture::set(int propId, long value, long mode)
 {
 //    CV_TRACE_FUNCTION();
     if (!icap.empty())
@@ -909,7 +912,7 @@ double VideoCapture::get(int propId) const
     return icvGetCaptureProperty(cap, propId) != 0;
 }
 
-bool VideoCapture::get(int propId, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue) 
+bool VideoCapture::get(int propId, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue) 
 {
 //    CV_TRACE_FUNCTION();
     if (!icap.empty())
@@ -920,13 +923,13 @@ bool VideoCapture::get(int propId, double &min, double &max, double &steppingDel
 VideoWriter::VideoWriter()
 {}
 
-VideoWriter::VideoWriter(const String& filename, int _fourcc, double fps, Size frameSize, bool isColor)
+VideoWriter::VideoWriter(const String& filename, int _fourcc, long fps, Size frameSize, bool isColor)
 {
     open(filename, _fourcc, fps, frameSize, isColor);
 }
 
 
-VideoWriter::VideoWriter(const String& filename, int apiPreference, int _fourcc, double fps, Size frameSize, bool isColor)
+VideoWriter::VideoWriter(const String& filename, int apiPreference, int _fourcc, long fps, Size frameSize, bool isColor)
 {
     open(filename, apiPreference, _fourcc, fps, frameSize, isColor);
 }
@@ -942,12 +945,12 @@ VideoWriter::~VideoWriter()
     release();
 }
 
-bool VideoWriter::open(const String& filename, int _fourcc, double fps, Size frameSize, bool isColor)
+bool VideoWriter::open(const String& filename, int _fourcc, long fps, Size frameSize, bool isColor)
 {
     return open(filename, CAP_ANY, _fourcc, fps, frameSize, isColor);
 }
 
-bool VideoWriter::open(const String& filename, int apiPreference, int _fourcc, double fps, Size frameSize, bool isColor)
+bool VideoWriter::open(const String& filename, int apiPreference, int _fourcc, long fps, Size frameSize, bool isColor)
 {
     CV_INSTRUMENT_REGION()
 
@@ -965,7 +968,7 @@ bool VideoWriter::isOpened() const
 }
 
 
-bool VideoWriter::set(int propId, double value)
+bool VideoWriter::set(int propId, long value)
 {
     if (!iwriter.empty())
         return iwriter->setProperty(propId, value);

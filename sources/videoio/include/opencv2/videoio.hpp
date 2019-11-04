@@ -799,7 +799,7 @@ public:
     @note Even if it returns `true` this doesn't ensure that the property
     value has been accepted by the capture device. See note in VideoCapture::get()
      */
-    CV_WRAP virtual bool set(int propId, double value);
+    CV_WRAP virtual bool set(int propId, long value);
 
     /** @brief  Sets a property in the VideoCapture
 
@@ -807,7 +807,7 @@ public:
  
     Sets the Camera Properties such brightness, contrast, etc., with a particular mode Selection 
     */
-    CV_WRAP virtual bool set(int propId, double value, double mode);
+    CV_WRAP virtual bool set(int propId, long value, long mode);
 
     /** @brief Returns the specified VideoCapture property
 
@@ -835,7 +835,7 @@ public:
     Gets the Particular Property's Minimum, Maximum, SupportedMode, CurrentMode, CurrentValue, DefaultValue
     */
 
-    CV_WRAP virtual bool get(int propId, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue);
+    CV_WRAP virtual bool get(int propId, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
 
     /** @brief Open video file or a capturing device or a IP video stream for video capturing with API Preference
 
@@ -895,14 +895,14 @@ public:
       (eg. FFMPEG FFV1, Huffman HFYU, Lagarith LAGS, etc...)
     - If FFMPEG is enabled, using `codec=0; fps=0;` you can create an uncompressed (raw) video file.
     */
-    CV_WRAP VideoWriter(const String& filename, int fourcc, double fps,
+    CV_WRAP VideoWriter(const String& filename, int fourcc, long fps,
                 Size frameSize, bool isColor = true);
 
     /** @overload
     The `apiPreference` parameter allows to specify API backends to use. Can be used to enforce a specific reader implementation
     if multiple are available: e.g. cv::CAP_FFMPEG or cv::CAP_GSTREAMER.
      */
-    CV_WRAP VideoWriter(const String& filename, int apiPreference, int fourcc, double fps,
+    CV_WRAP VideoWriter(const String& filename, int apiPreference, int fourcc, long fps,
                 Size frameSize, bool isColor = true);
 
     /** @brief Default destructor
@@ -919,12 +919,12 @@ public:
 
     The method first calls VideoWriter::release to close the already opened file.
      */
-    CV_WRAP virtual bool open(const String& filename, int fourcc, double fps,
+    CV_WRAP virtual bool open(const String& filename, int fourcc, long fps,
                       Size frameSize, bool isColor = true);
 
     /** @overload
      */
-    CV_WRAP bool open(const String& filename, int apiPreference, int fourcc, double fps,
+    CV_WRAP bool open(const String& filename, int apiPreference, int fourcc, long fps,
                       Size frameSize, bool isColor = true);
 
     /** @brief Returns true if video writer has been successfully initialized.
@@ -960,7 +960,7 @@ public:
      @param value Value of the property.
      @return  `true` if the property is supported by the backend used by the VideoWriter instance.
      */
-    CV_WRAP virtual bool set(int propId, double value);
+    CV_WRAP virtual bool set(int propId, long value);
 
     /** @brief Returns the specified VideoWriter property
 
@@ -985,7 +985,7 @@ protected:
     Ptr<CvVideoWriter> writer;
     Ptr<IVideoWriter> iwriter;
 
-    static Ptr<IVideoWriter> create(const String& filename, int fourcc, double fps,
+    static Ptr<IVideoWriter> create(const String& filename, int fourcc, long fps,
                                     Size frameSize, bool isColor = true);
 };
 

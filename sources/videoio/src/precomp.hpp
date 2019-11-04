@@ -93,10 +93,10 @@ struct CvCapture
     virtual bool getFormatType(int , cv::String &, int &, int &, int &) { return true; }
     virtual bool setFormatType(int ) { return true; }
     virtual double getProperty(int) const { return 0; }
-    virtual bool getProperty(int, double &, double &, double &, double &, double &, double &, double &) { return 0; }
+    virtual bool getProperty(int, long &, long &, long &, long &, long &, long &, long &) { return 0; }
 
-    virtual bool setProperty(int, double) { return 0; }
-    virtual bool setProperty(int, double, double) { return 0; }
+    virtual bool setProperty(int, long) { return 0; }
+    virtual bool setProperty(int, long, long) { return 0; }
     virtual bool grabFrame() { return true; }
     virtual IplImage* retrieveFrame(int) { return 0; }
     virtual int getCaptureDomain() { return cv::CAP_ANY; } // Return the type of the capture object: CAP_VFW, etc...
@@ -123,14 +123,14 @@ CvCapture* cvCreateFileCapture_Win32( const char* filename );
 CvCapture* cvCreateCameraCapture_VFW( int index );
 CvCapture* cvCreateFileCapture_VFW( const char* filename );
 CvVideoWriter* cvCreateVideoWriter_Win32( const char* filename, int fourcc,
-                                          double fps, CvSize frameSize, int is_color );
+                                          long fps, CvSize frameSize, int is_color );
 CvVideoWriter* cvCreateVideoWriter_VFW( const char* filename, int fourcc,
-                                        double fps, CvSize frameSize, int is_color );
+                                        long fps, CvSize frameSize, int is_color );
 CvCapture* cvCreateCameraCapture_DShow( int index );
 CvCapture* cvCreateCameraCapture_MSMF( int index );
 CvCapture* cvCreateFileCapture_MSMF (const char* filename);
 CvVideoWriter* cvCreateVideoWriter_MSMF( const char* filename, int fourcc,
-                                        double fps, CvSize frameSize, int is_color );
+                                        long fps, CvSize frameSize, int is_color );
 CvCapture* cvCreateCameraCapture_OpenNI( int index );
 CvCapture* cvCreateCameraCapture_OpenNI2( int index );
 CvCapture* cvCreateFileCapture_OpenNI( const char* filename );
@@ -157,23 +157,23 @@ CvCapture* cvCreateFileCapture_FFMPEG_proxy(const char* filename);
 
 
 CvVideoWriter* cvCreateVideoWriter_FFMPEG_proxy( const char* filename, int fourcc,
-                                            double fps, CvSize frameSize, int is_color );
+                                            long fps, CvSize frameSize, int is_color );
 
 CvCapture * cvCreateFileCapture_QT (const char  * filename);
 CvCapture * cvCreateCameraCapture_QT  (const int     index);
 
 CvVideoWriter* cvCreateVideoWriter_QT ( const char* filename, int fourcc,
-                                        double fps, CvSize frameSize, int is_color );
+                                        long fps, CvSize frameSize, int is_color );
 
 CvCapture* cvCreateFileCapture_AVFoundation (const char * filename);
 CvVideoWriter* cvCreateVideoWriter_AVFoundation( const char* filename, int fourcc,
-                                                double fps, CvSize frameSize, int is_color );
+                                                long fps, CvSize frameSize, int is_color );
 
 
 CvCapture * cvCreateCameraCapture_Unicap  (const int     index);
 CvCapture * cvCreateCameraCapture_PvAPI  (const int     index);
 CvVideoWriter* cvCreateVideoWriter_GStreamer( const char* filename, int fourcc,
-                                            double fps, CvSize frameSize, int is_color );
+                                            long fps, CvSize frameSize, int is_color );
 
 
 namespace cv
@@ -183,7 +183,7 @@ namespace cv
     public:
         virtual ~IVideoCapture() {}
         virtual double getProperty(int) const { return 0; }
-        virtual bool setProperty(int, double) { return false; }
+        virtual bool setProperty(int, long) { return false; }
         virtual bool grabFrame() = 0;
         virtual bool retrieveFrame(int, OutputArray) = 0;
         virtual bool isOpened() const = 0;
@@ -192,8 +192,8 @@ namespace cv
 	virtual bool getDeviceInfo(int , String &, String &, String &, String &) = 0;
 	virtual bool getFormats(int &) = 0;
 	virtual bool getFormatType(int , String &, int &, int &, int &) = 0;
-	virtual bool getVideoProperty(int, double &, double &, double &, double &, double &, double &, double &) = 0;
-	virtual bool setVideoProperty(int, double, double) = 0;
+	virtual bool getVideoProperty(int, long &, long &, long &, long &, long &, long &, long &) = 0;
+	virtual bool setVideoProperty(int, long, long) = 0;
     };
 
     class IVideoWriter
@@ -201,14 +201,14 @@ namespace cv
     public:
         virtual ~IVideoWriter() {}
         virtual double getProperty(int) const { return 0; }
-        virtual bool setProperty(int, double) { return false; }
+        virtual bool setProperty(int, long) { return false; }
 
         virtual bool isOpened() const = 0;
         virtual void write(InputArray) = 0;
     };
 
     Ptr<IVideoCapture> createMotionJpegCapture(const String& filename);
-    Ptr<IVideoWriter> createMotionJpegWriter( const String& filename, double fps, Size frameSize, bool iscolor );
+    Ptr<IVideoWriter> createMotionJpegWriter( const String& filename, long fps, Size frameSize, bool iscolor );
 
     Ptr<IVideoCapture> createGPhoto2Capture(int index);
     Ptr<IVideoCapture> createGPhoto2Capture(const String& deviceName);

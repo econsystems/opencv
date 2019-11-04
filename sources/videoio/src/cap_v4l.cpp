@@ -507,6 +507,7 @@ static int autosetup_capture_mode_v4l2(CvCaptureCAM_V4L* capture) {
             V4L2_PIX_FMT_JPEG,
 #endif
             V4L2_PIX_FMT_Y16,
+	    V4L2_PIX_FMT_Y12,  //Included by e-con 
 	    V4L2_PIX_FMT_GREY
     };
 
@@ -673,8 +674,13 @@ static void v4l2_create_frame(CvCaptureCAM_V4L *capture) {
         }
     }
 
-    /* Set up Image data */
-    cvInitImageHeader(&capture->frame, size, depth, channels);
+   // Included by e-con for Y12 and Y16 formats.
+   /* Set up Image data */
+    if(capture->palette == V4L2_PIX_FMT_Y12 || capture->palette == V4L2_PIX_FMT_Y16){	
+	  cvInitImageHeader(&capture->frame, size,IPL_DEPTH_16U ,1);
+	}
+   else 
+    	cvInitImageHeader(&capture->frame, size, depth, channels);
 
     /* Allocate space for pixelformat we convert to.
      * If we do not convert frame is just points to the buffer
@@ -1664,18 +1670,22 @@ static IplImage* icvRetrieveFrameCAM_V4L( CvCaptureCAM_V4L* capture, int) {
                 (unsigned char*)capture->buffers[(capture->bufferIndex+1) % capture->req.count].start,
                 (unsigned char*)capture->frame.imageData);
         break;
-    case V4L2_PIX_FMT_Y16:
-        if(capture->convert_rgb){
-            y16_to_rgb24(capture->form.fmt.pix.width,
-                         capture->form.fmt.pix.height,
-                         (unsigned char*)capture->buffers[capture->bufferIndex].start,
-                         (unsigned char*)capture->frame.imageData);
-        }else{
+	
+   /** Included by e-con.
+    * Image data is not processed. Directly transfered to user. 
+    */ 
+   case V4L2_PIX_FMT_Y16:   
             memcpy((char *)capture->frame.imageData,
                    (char *)capture->buffers[capture->bufferIndex].start,
-                   capture->frame.imageSize);
-        }
+                   capture->frame.imageSize);      
         break;
+    case V4L2_PIX_FMT_Y12:
+	if(capture->buffers[capture->bufferIndex].start > 0)
+            memcpy((char *)capture->frame.imageData,
+                   (char *)capture->buffers[capture->bufferIndex].start,
+                   capture->buffers[capture->bufferIndex].length);
+        break;
+   // Included by e-con end.
     case V4L2_PIX_FMT_GREY:
 	if(capture->convert_rgb){
 	    y8_to_rgb24(capture->form.fmt.pix.width,

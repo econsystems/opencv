@@ -601,7 +601,7 @@ public:
         quality = 0;
     }
 
-    MotionJpegWriter(const String& filename, double fps, Size size, bool iscolor)
+    MotionJpegWriter(const String& filename, long fps, Size size, bool iscolor)
     {
         rawstream = false;
         open(filename, fps, size, iscolor);
@@ -627,7 +627,7 @@ public:
         frameNumIndexes.clear();
     }
 
-    bool open(const String& filename, double fps, Size size, bool iscolor)
+    bool open(const String& filename, long fps, Size size, bool iscolor)
     {
         close();
 
@@ -644,7 +644,7 @@ public:
             return false;
 
         CV_Assert(fps >= 1);
-        outfps = cvRound(fps);
+        outfps = cvRound((float)fps);
         width = size.width;
         height = size.height;
         quality = 75;
@@ -869,7 +869,7 @@ public:
         return 0.;
     }
 
-    bool setProperty(int propId, double value)
+    bool setProperty(int propId, long value)
     {
         if( propId == VIDEOWRITER_PROP_QUALITY )
         {
@@ -1893,7 +1893,7 @@ void MotionJpegWriter::writeFrameData( const uchar* data, int step, int colorspa
 
 }
 
-Ptr<IVideoWriter> createMotionJpegWriter( const String& filename, double fps, Size frameSize, bool iscolor )
+Ptr<IVideoWriter> createMotionJpegWriter( const String& filename, long fps, Size frameSize, bool iscolor )
 {
     Ptr<IVideoWriter> iwriter = makePtr<mjpeg::MotionJpegWriter>(filename, fps, frameSize, iscolor);
     if( !iwriter->isOpened() )

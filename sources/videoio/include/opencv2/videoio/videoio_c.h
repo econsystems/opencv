@@ -151,7 +151,7 @@ CVAPI(bool) cvGetFormatType(CvCapture* capture, int formats, cv::String &formatT
 
 CVAPI(bool) cvSetFormatType(CvCapture* capture, int index);
 
-CVAPI(bool) cvSetVideoProperty(CvCapture* capture, int id, double value, double mode);
+CVAPI(bool) cvSetVideoProperty(CvCapture* capture, int id, long value, long mode);
 
 CVAPI(CvCapture*) cvGetDevices(int &devices);
 
@@ -535,7 +535,7 @@ enum
 CVAPI(double) cvGetCaptureProperty( CvCapture* capture, int property_id );
 /** @brief set capture properties
 */
-CVAPI(int)    cvSetCaptureProperty( CvCapture* capture, int property_id, double value );
+CVAPI(int)    cvSetCaptureProperty( CvCapture* capture, int property_id, long value );
 
 /** @brief Return the type of the capturer (eg, ::CV_CAP_VFW, ::CV_CAP_UNICAP)
 
@@ -573,7 +573,7 @@ CV_INLINE int CV_FOURCC(char c1, char c2, char c3, char c4)
 /** @brief initialize video file writer
 */
 CVAPI(CvVideoWriter*) cvCreateVideoWriter( const char* filename, int fourcc,
-                                           double fps, CvSize frame_size,
+                                           long fps, CvSize frame_size,
                                            int is_color CV_DEFAULT(1));
 
 /** @brief write frame to video file

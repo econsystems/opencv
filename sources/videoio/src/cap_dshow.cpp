@@ -88,6 +88,9 @@ Thanks to:
 */
 /////////////////////////////////////////////////////////
 
+#define GUID_FORMAT "%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX"
+#define GUID_ARG(guid) guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]
+
 #if defined _MSC_VER && _MSC_VER >= 100
 //'sprintf': name was marked as #pragma deprecated
 #pragma warning(disable: 4995)
@@ -155,6 +158,9 @@ DEFINE_GUID(MEDIASUBTYPE_BY8, 0x20385942, 0x0000, 0x0010, 0x80, 0x00,
 	0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
 
 DEFINE_GUID(MEDIASUBTYPE_Y16, 0x20363159, 0x0000, 0x0010, 0x80, 0x00, 
+	0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71);
+
+DEFINE_GUID(MEDIASUBTYPE_Y12, 0x20323159, 0x0000, 0x0010, 0x80, 0x00, 
 	0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71);
 //Included by e-con - end
 DEFINE_GUID(MEDIASUBTYPE_GREY, 0x59455247, 0x0000, 0x0010, 0x80, 0x00,
@@ -366,7 +372,7 @@ static void DebugPrintOut(const char *format, ...)
 //videoInput defines
 #define VI_VERSION      0.1995
 #define VI_MAX_CAMERAS  20
-#define VI_NUM_TYPES    21 //MGB //y16 
+#define VI_NUM_TYPES    22 //MGB //y16 //y12
 #define VI_NUM_FORMATS  18 //DON'T TOUCH
 
 //defines for setPhyCon - tuner is not as well supported as composite and s-video
@@ -590,7 +596,7 @@ class videoInput{
         void setPhyCon(int deviceID, int conn);
         void setAttemptCaptureSize(int deviceID, int w, int h,GUID mediaType=MEDIASUBTYPE_RGB24);
         bool setup(int deviceID);
-        void processPixels(unsigned char * src, unsigned char * dst, int width, int height, bool bRGB, bool bFlip);
+		void processPixels(unsigned char * src, unsigned char * dst, int width, int height, bool bRGB, bool bFlip);
         int  start(int deviceID, videoDevice * VD);
         int  getDeviceCount();
         void getMediaSubtypeAsString(GUID type, char * typeAsString);
@@ -757,7 +763,7 @@ public:
             latestBufferLength = pSample->GetActualDataLength();
               if(latestBufferLength == numBytes){
                 EnterCriticalSection(&critSection);
-                      memcpy(pixels, ptrBuffer, latestBufferLength);
+				memcpy(pixels, ptrBuffer, latestBufferLength);
                     newFrame    = true;
                     freezeCheck = 1;
                 LeaveCriticalSection(&critSection);
@@ -866,6 +872,8 @@ void videoDevice::setSize(int w, int h){
 			videoSize = w * h;
 		else if(pAmMediaType->subtype == MEDIASUBTYPE_Y16)
 			videoSize = w * h * 2;
+		else if(pAmMediaType->subtype == MEDIASUBTYPE_Y12)
+			videoSize = w * h * 1.5;
 		else
 			videoSize           = w*h*3;
 		//Included conditional buffer size by e-con - end
@@ -1146,13 +1154,16 @@ videoInput::videoInput(){
 
     //non standard
     mediaSubtypes[16]    = MEDIASUBTYPE_Y800;
-    mediaSubtypes[17]    = MEDIASUBTYPE_Y8;
-    mediaSubtypes[18]    = MEDIASUBTYPE_GREY;
+//	mediaSubtypes[17] = MEDIASUBTYPE_Y8;
+	mediaSubtypes[22] = MEDIASUBTYPE_Y8;
+	mediaSubtypes[18]    = MEDIASUBTYPE_GREY;
     mediaSubtypes[19]    = MEDIASUBTYPE_I420;
     //Included by e-con
     mediaSubtypes[20]    = MEDIASUBTYPE_BY8;
     mediaSubtypes[21]	 = MEDIASUBTYPE_Y16;
-    //Included by e-con - end
+//	mediaSubtypes[22]	 = MEDIASUBTYPE_Y12;
+	mediaSubtypes[17]	 = MEDIASUBTYPE_Y12;
+	//Included by e-con - end
 
     //The video formats we support
     formatTypes[VI_NTSC_M]      = AnalogVideo_NTSC_M;
@@ -1228,8 +1239,10 @@ void videoInput::setAutoReconnectOnFreeze(int deviceNumber, bool doReconnect, in
 bool videoInput::setupDevice(int deviceNumber){
     if(deviceNumber >= VI_MAX_CAMERAS || VDList[deviceNumber]->readyToCapture) return false;
 
-    if(setup(deviceNumber))return true;
-    return false;
+    if(setup(deviceNumber))
+		return true;
+	else
+		return false;
 }
 
 
@@ -1297,15 +1310,15 @@ bool videoInput::setupDevice(int deviceNumber, int w, int h, int _connection){
     return false;
 }
 
-float round(float var)
-{
-    // 37.66666 * 100 =3766.66
-    // 3766.66 + .5 =3767.16    for rounding off value
-    // then type cast to int so value is 3766
-    // then divided by 100 so the value converted into 37.66
-    float value = (int)(var * 100 + .5);
-    return (float)value / 100;
-}
+//float round(float var)
+//{
+//    // 37.66666 * 100 =3766.66
+//    // 3766.66 + .5 =3767.16    for rounding off value
+//    // then type cast to int so value is 3766
+//    // then divided by 100 so the value converted into 37.66
+//    float value = (int)(var * 100 + .5);
+//    return (float)value / 100;
+//}
 
 // ----------------------------------------------------------------------
 // Get total number of Formats/Resolution/Fps supported by the Specific Camera
@@ -1314,10 +1327,13 @@ float round(float var)
 bool videoInput::getFormats(int deviceID, int &formats)
 {
     CoInitialize(0);
-    HRESULT hr = getDevice(&VDList[deviceID]->pVideoInputFilter, deviceID, VDList[deviceID]->wDeviceName, VDList[deviceID]->nDeviceName);
-    if(hr != S_OK)	
-	return false;
-    hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, NULL, CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2, (void **)&VDList[deviceID]->pCaptureGraph);
+ 
+	HRESULT hr = getDevice(&VDList[deviceID]->pVideoInputFilter, deviceID, VDList[deviceID]->wDeviceName, VDList[deviceID]->nDeviceName);
+	if (hr != S_OK)
+	{
+		return false;
+	} 
+	hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, NULL, CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2, (void **)&VDList[deviceID]->pCaptureGraph);
     if (FAILED(hr))    // FAILED is a macro that tests the return value
     {
         DebugPrintOut("ERROR - Could not create the Filter Graph Manager\n");
@@ -1718,37 +1734,40 @@ bool videoInput::getPixels(int id, unsigned char * dstBuffer, bool flipRedAndBlu
     bool success = false;
 
     if(isDeviceSetup(id)){
-        if(bCallback){
-            //callback capture
+		if (bCallback) {
+			//callback capture
 
-            DWORD result = WaitForSingleObject(VDList[id]->sgCallback->hEvent, 1000);
-            if( result != WAIT_OBJECT_0) return false;
+			DWORD result = WaitForSingleObject(VDList[id]->sgCallback->hEvent, 1000);
+			if (result != WAIT_OBJECT_0) return false;
 
-            //double paranoia - mutexing with both event and critical section
-            EnterCriticalSection(&VDList[id]->sgCallback->critSection);
+			//double paranoia - mutexing with both event and critical section
+			EnterCriticalSection(&VDList[id]->sgCallback->critSection);
 
-            unsigned char * src = VDList[id]->sgCallback->pixels;
-            unsigned char * dst = dstBuffer;
-            int height          = VDList[id]->height;
-            int width           = VDList[id]->width;
+			unsigned char * src = VDList[id]->sgCallback->pixels;
+			unsigned char * dst = dstBuffer;
+			int height = VDList[id]->height;
+			int width = VDList[id]->width;
 
-            //Added condition based operation by e-con - end
-	    if(checkSingleByteFormat(VDList[id]->pAmMediaType->subtype))
-     	        memcpy(dst, src, width * height);
-	    else if(VDList[id]->pAmMediaType->subtype == MEDIASUBTYPE_Y16)
-	        memcpy(dst, src, width * height * 2);
-	    else
-	        processPixels(src, dst, width, height, flipRedAndBlue, flipImage);
-	    //Added condition based operation by e-con - end
-            VDList[id]->sgCallback->newFrame = false;
+			//Added condition based operation by e-con - end
+			if (checkSingleByteFormat(VDList[id]->pAmMediaType->subtype))
+				memcpy(dst, src, width * height);
+			else if (VDList[id]->pAmMediaType->subtype == MEDIASUBTYPE_Y16)
+				memcpy(dst, src, width * height * 2);
+			else if (VDList[id]->pAmMediaType->subtype == MEDIASUBTYPE_Y12)
+				memcpy(dst, src, width * height * 1.5);
+			else
+			{
+				processPixels(src, dst, width, height, flipRedAndBlue, flipImage);
+			}//Added condition based operation by e-con - end
+			VDList[id]->sgCallback->newFrame = false;
 
-            LeaveCriticalSection(&VDList[id]->sgCallback->critSection);
+			LeaveCriticalSection(&VDList[id]->sgCallback->critSection);
 
-            ResetEvent(VDList[id]->sgCallback->hEvent);
+			ResetEvent(VDList[id]->sgCallback->hEvent);
 
-            success = true;
+			success = true;
 
-        }
+		}
         else{
             //regular capture method
             long bufferSize = VDList[id]->videoSize;
@@ -1767,6 +1786,8 @@ bool videoInput::getPixels(int id, unsigned char * dstBuffer, bool flipRedAndBlu
 			memcpy(dst, src, width * height);
 		    else if(VDList[id]->pAmMediaType->subtype == MEDIASUBTYPE_Y16)
 			memcpy(dst, src, width * height * 2);
+			else if(VDList[id]->pAmMediaType->subtype == MEDIASUBTYPE_Y12)
+			memcpy(dst, src, width * height * 1.5);
 		    else
 			processPixels(src, dst, width, height, flipRedAndBlue, flipImage);
 		    //Added condition based operation by e-con - end
@@ -2641,6 +2662,7 @@ void videoInput::getMediaSubtypeAsString(GUID type, char * typeAsString){
     //Included by e-con
     else if(type == MEDIASUBTYPE_BY8)  sprintf(tmpStr, "BY8");
     else if(type == MEDIASUBTYPE_Y16)  sprintf(tmpStr, "Y16");
+	else if(type == MEDIASUBTYPE_Y12)  sprintf(tmpStr, "Y12");
     //Included by e-con - end
     else sprintf(tmpStr, "OTHER");
 
@@ -2911,11 +2933,16 @@ static bool setSizeAndSubtype(videoDevice * VD, int attemptWidth, int attemptHei
     }
     else if ((mediatype == MEDIASUBTYPE_YUY2) || (mediatype == MEDIASUBTYPE_YVYU) ||
 		(mediatype == MEDIASUBTYPE_UYVY) || (mediatype == MEDIASUBTYPE_Y16)){      
-
-        VD->pAmMediaType->lSampleSize = attemptWidth*attemptHeight * 2;
+		VD->pAmMediaType->lSampleSize = attemptWidth*attemptHeight * 2;
     }
-    else{
-        VD->pAmMediaType->lSampleSize = 0;
+	else if ((mediatype == MEDIASUBTYPE_Y12)){
+		VD->pAmMediaType->lSampleSize = attemptWidth * attemptHeight * 1.5;
+	}
+	else if ((mediatype == MEDIASUBTYPE_Y8)) {
+		VD->pAmMediaType->lSampleSize = attemptWidth * attemptHeight;
+	}
+	else{
+		VD->pAmMediaType->lSampleSize = 0;
     }
 
     //set fps if requested
@@ -2942,115 +2969,133 @@ static bool setSizeAndSubtype(videoDevice * VD, int attemptWidth, int attemptHei
 // Attempts to build a graph for the specified device
 // ----------------------------------------------------------------------
 
-int videoInput::start(int deviceID, videoDevice *VD){
+int videoInput::start(int deviceID, videoDevice *VD) {
 
-    HRESULT hr             = NOERROR;
-    VD->myID             = deviceID;
-    VD->setupStarted    = true;
-    CAPTURE_MODE           = PIN_CATEGORY_CAPTURE; //Don't worry - it ends up being preview (which is faster)
-    callbackSetCount     = 1;  //make sure callback method is not changed after setup called
+	HRESULT hr = NOERROR;
+	VD->myID = deviceID;
+	VD->setupStarted = true;
+	CAPTURE_MODE = PIN_CATEGORY_CAPTURE; //Don't worry - it ends up being preview (which is faster)
+	callbackSetCount = 1;  //make sure callback method is not changed after setup called
 
-    DebugPrintOut("SETUP: Setting up device %i\n",deviceID);
+	DebugPrintOut("SETUP: Setting up device %i\n", deviceID);
 
-    // CREATE THE GRAPH BUILDER //
-    // Create the filter graph manager and query for interfaces.
-    hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, NULL, CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2, (void **)&VD->pCaptureGraph);
-    if (FAILED(hr))    // FAILED is a macro that tests the return value
-    {
-        DebugPrintOut("ERROR - Could not create the Filter Graph Manager\n");
-        return hr;
-    }
+	// CREATE THE GRAPH BUILDER //
+	// Create the filter graph manager and query for interfaces.
+	hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, NULL, CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2, (void **)&VD->pCaptureGraph);
+	if (FAILED(hr))    // FAILED is a macro that tests the return value
+	{
+		DebugPrintOut("ERROR - Could not create the Filter Graph Manager\n");
+		return hr;
+	}
+	else
+		DebugPrintOut("SUCESS: Created Graph Manager \n");
 
-    //FITLER GRAPH MANAGER//
-    // Create the Filter Graph Manager.
-    hr = CoCreateInstance(CLSID_FilterGraph, 0, CLSCTX_INPROC_SERVER,IID_IGraphBuilder, (void**)&VD->pGraph);
-    if (FAILED(hr))
-    {
-        DebugPrintOut("ERROR - Could not add the graph builder!\n");
-        stopDevice(deviceID);
-        return hr;
-    }
+	//FITLER GRAPH MANAGER//
+	// Create the Filter Graph Manager.
+	hr = CoCreateInstance(CLSID_FilterGraph, 0, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void**)&VD->pGraph);
+	if (FAILED(hr))
+	{
+		DebugPrintOut("ERROR - Could not add the graph builder!\n");
+		stopDevice(deviceID);
+		return hr;
+	}
+	else
+		DebugPrintOut("SUCESS: Created Graph Builder \n");
 
-    //MEDIA EVENT//
-    //Used to obtain event when capture device is disconnected
-    hr = VD->pGraph->QueryInterface(IID_IMediaEventEx, (void**)&VD->pMediaEvent);
-    if (FAILED(hr))
-    {
-        DebugPrintOut("ERROR - Could not create media event object\n");
-        stopDevice(deviceID);
-        return hr;
-    }
+	//MEDIA EVENT//
+	//Used to obtain event when capture device is disconnected
+	hr = VD->pGraph->QueryInterface(IID_IMediaEventEx, (void**)&VD->pMediaEvent);
+	if (FAILED(hr))
+	{
+		DebugPrintOut("ERROR - Could not create media event object\n");
+		stopDevice(deviceID);
+		return hr;
+	}
+	else
+		DebugPrintOut("SUCESS: Created media event object\n");
 
-    //SET THE FILTERGRAPH//
-    hr = VD->pCaptureGraph->SetFiltergraph(VD->pGraph);
-    if (FAILED(hr))
-    {
-        DebugPrintOut("ERROR - Could not set filtergraph\n");
-        stopDevice(deviceID);
-        return hr;
-    }
+	//SET THE FILTERGRAPH//
+	hr = VD->pCaptureGraph->SetFiltergraph(VD->pGraph);
+	if (FAILED(hr))
+	{
+		DebugPrintOut("ERROR - Could not set filtergraph\n");
+		stopDevice(deviceID);
+		return hr;
+	}
+	else
+		DebugPrintOut("SUCESS: set filtergraph\n");
 
-    //MEDIA CONTROL (START/STOPS STREAM)//
-    // Using QueryInterface on the graph builder,
-    // Get the Media Control object.
-    hr = VD->pGraph->QueryInterface(IID_IMediaControl, (void **)&VD->pControl);
-    if (FAILED(hr))
-    {
-        DebugPrintOut("ERROR - Could not create the Media Control object\n");
-        stopDevice(deviceID);
-        return hr;
-    }
+	//MEDIA CONTROL (START/STOPS STREAM)//
+	// Using QueryInterface on the graph builder,
+	// Get the Media Control object.
+	hr = VD->pGraph->QueryInterface(IID_IMediaControl, (void **)&VD->pControl);
+	if (FAILED(hr))
+	{
+		DebugPrintOut("ERROR - Could not create the Media Control object\n");
+		stopDevice(deviceID);
+		return hr;
+	}
+	else 
+		DebugPrintOut("SUCESS: Created the Media Control object\n");
 
+	//FIND VIDEO DEVICE AND ADD TO GRAPH//
+	//gets the device specified by the second argument.
+	hr = getDevice(&VD->pVideoInputFilter, deviceID, VD->wDeviceName, VD->nDeviceName);
 
-    //FIND VIDEO DEVICE AND ADD TO GRAPH//
-    //gets the device specified by the second argument.
-    hr = getDevice(&VD->pVideoInputFilter, deviceID, VD->wDeviceName, VD->nDeviceName);
+	if (SUCCEEDED(hr)) {
+		DebugPrintOut("SETUP: %s\n", VD->nDeviceName);
+		hr = VD->pGraph->AddFilter(VD->pVideoInputFilter, VD->wDeviceName);
+	}
+	else {
+		DebugPrintOut("ERROR - Could not find specified video device\n");
+		stopDevice(deviceID);
+		return hr;
+	}
 
-    if (SUCCEEDED(hr)){
-        DebugPrintOut("SETUP: %s\n", VD->nDeviceName);
-        hr = VD->pGraph->AddFilter(VD->pVideoInputFilter, VD->wDeviceName);
-    }else{
-        DebugPrintOut("ERROR - Could not find specified video device\n");
-        stopDevice(deviceID);
-        return hr;
-    }
+	//LOOK FOR PREVIEW PIN IF THERE IS NONE THEN WE USE CAPTURE PIN AND THEN SMART TEE TO PREVIEW
+	IAMStreamConfig *streamConfTest = NULL;
+	hr = VD->pCaptureGraph->FindInterface(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video, VD->pVideoInputFilter, IID_IAMStreamConfig, (void **)&streamConfTest);
+	if (FAILED(hr)) {
+		DebugPrintOut("SETUP: Couldn't find preview pin using SmartTee\n");
+	}
+	else {
+		CAPTURE_MODE = PIN_CATEGORY_PREVIEW;
+		streamConfTest->Release();
+		streamConfTest = NULL;
+	}
 
-    //LOOK FOR PREVIEW PIN IF THERE IS NONE THEN WE USE CAPTURE PIN AND THEN SMART TEE TO PREVIEW
-    IAMStreamConfig *streamConfTest = NULL;
-    hr = VD->pCaptureGraph->FindInterface(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video, VD->pVideoInputFilter, IID_IAMStreamConfig, (void **)&streamConfTest);
-    if(FAILED(hr)){
-        DebugPrintOut("SETUP: Couldn't find preview pin using SmartTee\n");
-    }else{
-         CAPTURE_MODE = PIN_CATEGORY_PREVIEW;
-         streamConfTest->Release();
-         streamConfTest = NULL;
-    }
+	//CROSSBAR (SELECT PHYSICAL INPUT TYPE)//
+	//my own function that checks to see if the device can support a crossbar and if so it routes it.
+	//webcams tend not to have a crossbar so this function will also detect a webcams and not apply the crossbar
+	if (VD->useCrossbar)
+	{
+		DebugPrintOut("SETUP: Checking crossbar\n");
+		routeCrossbar(&VD->pCaptureGraph, &VD->pVideoInputFilter, VD->connection, CAPTURE_MODE);
+	}
 
-    //CROSSBAR (SELECT PHYSICAL INPUT TYPE)//
-    //my own function that checks to see if the device can support a crossbar and if so it routes it.
-    //webcams tend not to have a crossbar so this function will also detect a webcams and not apply the crossbar
-    if(VD->useCrossbar)
-    {
-        DebugPrintOut("SETUP: Checking crossbar\n");
-        routeCrossbar(&VD->pCaptureGraph, &VD->pVideoInputFilter, VD->connection, CAPTURE_MODE);
-    }
+	//we do this because webcams don't have a preview mode
+	hr = VD->pCaptureGraph->FindInterface(&CAPTURE_MODE, &MEDIATYPE_Video, VD->pVideoInputFilter, IID_IAMStreamConfig, (void **)&VD->streamConf);
+	if (FAILED(hr)) {
+		DebugPrintOut("ERROR: Couldn't config the stream!\n");
+		stopDevice(deviceID);
+		return hr;
+	}
+	else 
+		DebugPrintOut("SUCESS: configered the stream!\n");
 
+	//NOW LETS DEAL WITH GETTING THE RIGHT SIZE
+	hr = VD->streamConf->GetFormat(&VD->pAmMediaType);
+	if (FAILED(hr)) {
+		DebugPrintOut("ERROR: Couldn't getFormat for pAmMediaType!\n");
+		stopDevice(deviceID);
+		return hr;
+	}
 
-    //we do this because webcams don't have a preview mode
-    hr = VD->pCaptureGraph->FindInterface(&CAPTURE_MODE, &MEDIATYPE_Video, VD->pVideoInputFilter, IID_IAMStreamConfig, (void **)&VD->streamConf);
-    if(FAILED(hr)){
-        DebugPrintOut("ERROR: Couldn't config the stream!\n");
-        stopDevice(deviceID);
-        return hr;
-    }
+	char guidstr[10];
+	getMediaSubtypeAsString(VD->pAmMediaType->subtype, guidstr);
 
-    //NOW LETS DEAL WITH GETTING THE RIGHT SIZE
-    hr = VD->streamConf->GetFormat(&VD->pAmMediaType);
-    if(FAILED(hr)){
-        DebugPrintOut("ERROR: Couldn't getFormat for pAmMediaType!\n");
-        stopDevice(deviceID);
-        return hr;
-    }
+	DebugPrintOut("Getting format from device is : sample size : %u , guid subtype string : %s \n", VD->pAmMediaType->lSampleSize, guidstr);
+	DebugPrintOut("GUID : { " GUID_FORMAT " } \r\n", GUID_ARG(VD->pAmMediaType->subtype));
 
     VIDEOINFOHEADER *pVih =  reinterpret_cast<VIDEOINFOHEADER*>(VD->pAmMediaType->pbFormat);
     int currentWidth    =  HEADER(pVih)->biWidth;
@@ -3072,21 +3117,22 @@ int videoInput::start(int deviceID, videoDevice *VD){
                 VD->setSize(VD->tryWidth, VD->tryHeight);
                 VD->videoType = VD->tryVideoType;
                 foundSize = true;
-            } else {
-                // try specified size with all formats
-                for(int i = 0; i < VI_NUM_TYPES; i++){
+			}
+			else {
+				//// try specified size with all formats
+				for (int i = 0; i < VI_NUM_TYPES; i++) {
 
-                    getMediaSubtypeAsString(mediaSubtypes[i], guidStr);
+					getMediaSubtypeAsString(mediaSubtypes[i], guidStr);
 
-                    DebugPrintOut("SETUP: trying format %s @ %ix%i\n", guidStr, VD->tryWidth, VD->tryHeight);
-                    if( setSizeAndSubtype(VD, VD->tryWidth, VD->tryHeight, mediaSubtypes[i]) ){
-                        VD->setSize(VD->tryWidth, VD->tryHeight);
-                        VD->videoType = mediaSubtypes[i];
-                        foundSize = true;
-                        break;
-                    }
-                }
-            }
+					DebugPrintOut("%d. SETUP: trying format %s @ %ix%i\n", i, guidStr, VD->tryWidth, VD->tryHeight);
+					if (setSizeAndSubtype(VD, VD->tryWidth, VD->tryHeight, mediaSubtypes[i])) {
+						VD->setSize(VD->tryWidth, VD->tryHeight);
+						VD->videoType = mediaSubtypes[i];
+						foundSize = true;
+						break;
+					}
+				}
+			}
 
 
         //if we didn't find the requested size - lets try and find the closest matching size
@@ -3123,11 +3169,13 @@ int videoInput::start(int deviceID, videoDevice *VD){
     //SAMPLE GRABBER (ALLOWS US TO GRAB THE BUFFER)//
     // Create the Sample Grabber.
     hr = CoCreateInstance(CLSID_SampleGrabber, NULL, CLSCTX_INPROC_SERVER,IID_IBaseFilter, (void**)&VD->pGrabberF);
-    if (FAILED(hr)){
+	if (FAILED(hr)){
         DebugPrintOut("Could not Create Sample Grabber - CoCreateInstance()\n");
         stopDevice(deviceID);
         return hr;
     }
+	else
+		DebugPrintOut("Created Sample Grabber - CoCreateInstance()\n");
 
     hr = VD->pGraph->AddFilter(VD->pGrabberF, L"Sample Grabber");
     if (FAILED(hr)){
@@ -3135,6 +3183,8 @@ int videoInput::start(int deviceID, videoDevice *VD){
         stopDevice(deviceID);
         return hr;
     }
+	else 
+		DebugPrintOut("Added Sample Grabber - AddFilter()\n");
 
     hr = VD->pGrabberF->QueryInterface(IID_ISampleGrabber, (void**)&VD->pGrabber);
     if (FAILED(hr)){
@@ -3173,14 +3223,14 @@ int videoInput::start(int deviceID, videoDevice *VD){
 
     mt.majortype     = MEDIATYPE_Video;
     //Included conditional based format by e-con
-	if(checkSingleByteFormat(VD->pAmMediaType->subtype) || (VD->pAmMediaType->subtype == MEDIASUBTYPE_Y16))
+	if(checkSingleByteFormat(VD->pAmMediaType->subtype) || (VD->pAmMediaType->subtype == MEDIASUBTYPE_Y16) || (VD->pAmMediaType->subtype == MEDIASUBTYPE_Y12))
 		mt.subtype         = VD->pAmMediaType->subtype;
 	else
 		mt.subtype         = MEDIASUBTYPE_RGB24;	//Making it RGB24, does conversion from YUV to RGB
 	//Included conditional based format by e-con - end
     mt.formattype     = FORMAT_VideoInfo;
 
-    //VD->pAmMediaType->subtype = VD->videoType;
+    VD->pAmMediaType->subtype = VD->videoType;
     hr = VD->pGrabber->SetMediaType(&mt);
 
     //lets try freeing our stream conf here too
@@ -3203,6 +3253,8 @@ int videoInput::start(int deviceID, videoDevice *VD){
         stopDevice(deviceID);
         return hr;
     }
+	else 
+		DebugPrintOut("Created NullRenderer\n");
 
     hr = VD->pGraph->AddFilter(VD->pDestFilter, L"NullRenderer");
     if (FAILED(hr)){
@@ -3210,17 +3262,20 @@ int videoInput::start(int deviceID, videoDevice *VD){
         stopDevice(deviceID);
         return hr;
     }
+	else
+		DebugPrintOut("Added NullRenderer\n");
 
     //RENDER STREAM//
     //This is where the stream gets put together.
-    hr = VD->pCaptureGraph->RenderStream(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video, VD->pVideoInputFilter, VD->pGrabberF, VD->pDestFilter);
+    hr = VD->pCaptureGraph->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, VD->pVideoInputFilter, VD->pGrabberF, VD->pDestFilter);
 
     if (FAILED(hr)){
         DebugPrintOut("ERROR: Could not connect pins - RenderStream()\n");
         stopDevice(deviceID);
         return hr;
     }
-
+	else
+		DebugPrintOut("SUCESS: Connected pins - RenderStream()\n");
 
     //EXP - lets try setting the sync source to null - and make it run as fast as possible
     {
@@ -3354,6 +3409,9 @@ HRESULT videoInput::getDevice(IBaseFilter** gottaFilter, int deviceId, WCHAR * w
     {
         return hr;
     }
+	else
+		DebugPrintOut("SUCESS: getDevice :: SystemDeviceEnum ..... \n");
+
 
     // Obtain a class enumerator for the video input category.
     IEnumMoniker *pEnumCat = NULL;
@@ -3681,12 +3739,12 @@ double VideoCapture_DShow::getProperty(int propIdx) const
     // unknown parameter or value not available
     return -1;
 }
-bool VideoCapture_DShow::setProperty(int propIdx, double propVal)
+bool VideoCapture_DShow::setProperty(int propIdx, long propVal)
 {
     // image capture properties
     bool handled = false;
     switch (propIdx)
-    {
+    { 
     case CV_CAP_PROP_FRAME_WIDTH:
         m_width = cvRound(propVal);
         handled = true;
@@ -3704,7 +3762,7 @@ bool VideoCapture_DShow::setProperty(int propIdx, double propVal)
             // following cvCreateVideo usage will pop up caprturepindialog here if fourcc=-1
             // TODO - how to create a capture pin dialog
         }
-        handled = true;
+		handled = true;
         break;
 
     case CV_CAP_PROP_FPS:
@@ -3726,7 +3784,7 @@ bool VideoCapture_DShow::setProperty(int propIdx, double propVal)
         // a stream setting
         if (m_width > 0 && m_height > 0)
         {
-            if (m_width != g_VI.getWidth(m_index) || m_height != g_VI.getHeight(m_index) )//|| fourcc != VI.getFourcc(index) )
+            if (m_width != g_VI.getWidth(m_index) || m_height != g_VI.getHeight(m_index)  || m_fourcc != g_VI.getFourcc(m_index) )
             {
                 int fps = static_cast<int>(g_VI.getFPS(m_index));
                 g_VI.stopDevice(m_index);
@@ -3877,11 +3935,13 @@ bool VideoCapture_DShow::retrieveFrame(int, OutputArray frame)
 {
     int w = g_VI.getWidth(m_index), h = g_VI.getHeight(m_index);
     //Included conditional opencv datatype allocation ,as single byte datatype does not need much memory. By e-con
-    if(checkSingleByteFormat(g_VI.getMediasubtype(m_index)))
-  	frame.create( Size(w,h), CV_8UC1);
-    else if(g_VI.getMediasubtype(m_index) == MEDIASUBTYPE_Y16)
-	frame.create( Size(w, h), CV_16UC1);
-    else
+	if (checkSingleByteFormat(g_VI.getMediasubtype(m_index)))
+		frame.create(Size(w, h), CV_8UC1);
+	else if (g_VI.getMediasubtype(m_index) == MEDIASUBTYPE_Y16)
+		frame.create(Size(w, h), CV_16UC1);
+	else if (g_VI.getMediasubtype(m_index) == MEDIASUBTYPE_Y12)
+		frame.create(Size(w, h), CV_12UC1);
+	else
 	frame.create(Size(w,h), CV_8UC3);
     //Included conditional opencv datatype allocation by e-con - end
 
@@ -3905,10 +3965,11 @@ void VideoCapture_DShow::open(int index)
         return;
     if (index < 0 || index > devices-1)
         return;
-    g_VI.setupDevice(index);
-    if (!g_VI.isDeviceSetup(index))
+    if(g_VI.setupDevice(index))
+	if (!g_VI.isDeviceSetup(index))
         return;
     m_index = index;
+
 }
 
 void VideoCapture_DShow::close()

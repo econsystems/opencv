@@ -205,7 +205,7 @@ public:
     {
         return ffmpegCapture ? icvGetCaptureProperty_FFMPEG_p(ffmpegCapture, propId) : 0;
     }
-    virtual bool setProperty(int propId, double value)
+    virtual bool setProperty(int propId, long value)
     {
         return ffmpegCapture ? icvSetCaptureProperty_FFMPEG_p(ffmpegCapture, propId, value)!=0 : false;
     }
@@ -274,7 +274,7 @@ public:
         return icvWriteFrame_FFMPEG_p(ffmpegWriter, (const uchar*)image->imageData,
              image->widthStep, image->width, image->height, image->nChannels, image->origin) !=0;
     }
-    virtual bool open( const char* filename, int fourcc, double fps, CvSize frameSize, bool isColor )
+    virtual bool open( const char* filename, int fourcc, long fps, CvSize frameSize, bool isColor )
     {
         icvInitFFMPEG::Init();
         close();
@@ -298,7 +298,7 @@ protected:
 
 
 CvVideoWriter* cvCreateVideoWriter_FFMPEG_proxy( const char* filename, int fourcc,
-                                          double fps, CvSize frameSize, int isColor )
+                                          long fps, CvSize frameSize, int isColor )
 {
     CvVideoWriter_FFMPEG_proxy* result = new CvVideoWriter_FFMPEG_proxy;
 

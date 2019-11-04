@@ -69,7 +69,7 @@ public:
     virtual bool open(int cameraId);
     virtual void close();
     virtual double getProperty(int) const;
-    virtual bool setProperty(int, double);
+    virtual bool setProperty(int, long);
     virtual bool grabFrame();
     virtual IplImage* retrieveFrame(int);
 
@@ -492,7 +492,7 @@ bool CvCaptureCAM_CMU::setFormat(int format)
     return true;
 }
 
-bool CvCaptureCAM_CMU::setProperty( int property_id, double value )
+bool CvCaptureCAM_CMU::setProperty( int property_id, long value )
 {
     bool retval = false;
     int ival = cvRound(value);

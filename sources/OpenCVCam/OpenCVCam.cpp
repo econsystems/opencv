@@ -26,6 +26,7 @@
 
 #include <stdio.h>
 #include <iostream>
+#include <fstream>      // Added to Save buffer as .raw format. (CU55_MH).
 #include <thread>
 #include <vector>
 
@@ -44,9 +45,9 @@ using namespace cv;
 
 #define PROPERTY			19
 
-typedef BOOL (*Readfirmwareversion_t) (UINT8 *, UINT8 *, UINT16 *, UINT16 *);
-typedef BOOL (*Initextensionunit_t) (TCHAR *);
-typedef BOOL (*Deinitextensionunit_t) ();
+typedef BOOL(*Readfirmwareversion_t) (UINT8 *, UINT8 *, UINT16 *, UINT16 *);
+typedef BOOL(*Initextensionunit_t) (TCHAR *);
+typedef BOOL(*Deinitextensionunit_t) ();
 Readfirmwareversion_t readfirmwareversion;
 Initextensionunit_t initextensionunit;
 Deinitextensionunit_t deinitextensionunit;
@@ -61,13 +62,15 @@ Deinitextensionunit_t deinitextensionunit;
 VideoCapture cap;
 Mat Frame, BayerFrame8, IRImage, BGRImage, ResultImage;
 char keyPressed = '\0', dilemma = 'y';
-int devices = 0, formats = 0, width = 0, height = 0, fps = 0;
-double minimum = 0, maximum = 0, defaultValue = 0, currentValue = 0, steppingDelta = 0, supportedMode = 0, currentMode = 0, value = 0;
+int devices = 0, formats = 0, width = 0, current_width =0,current_height =0,height = 0, fps = 0;
+long minimum = 0, maximum = 0, defaultValue = 0, currentValue = 0, steppingDelta = 0, supportedMode = 0, currentMode = 0, value = 0;
 vector< pair <int, String> > uvcProperty;
 unsigned char outputBuffer[BUFFERLENGTH], inputBuffer[BUFFERLENGTH];
 String deviceName, vid, pid, devicePath, formatType;
-bool bOpenHID = false, bCapture, bPreview, bSwitch, _12CUNIR, _CU51, _CU40, _10CUG_C;
+bool bOpenHID = false, bCapture, bPreview, bSwitch, _12CUNIR, _CU51, _CU40, _10CUG_C,_CU55M,_20CUG;
 mutex mu;
+uchar* Y12Buff, *PixelBuff,*StillBuff;
+bool IsBuffCreated = false,Y12Format = false,callForFormat = true;
 
 #ifdef _WIN32
 
@@ -140,6 +143,102 @@ bool ConvertRGIR2RGGB(Mat BayerRGIR, Mat &BayerRGGB, Mat &IRimage)
     return true;
 }
 
+// To get the current set format, 
+bool getCurrentFormat(){
+
+    if(!(cap.getFormatType(0, formatType, width, height, fps)))
+    {
+	cout << endl << "Camera Get Format Type Failed" << endl;
+	return false;
+    }
+    current_width = width;
+    current_height = height;
+    if(formatType == "Y12 ")
+	Y12Format =true;
+}
+
+/** Converting Y12 format to Y8 for See3CAM_CU55M.
+  * Y12 format is decoded with 3 bytes for 2 pixels. 
+  * Need to skip the 3rd byte everytime in order to get a byte per pixel
+ **/
+ 
+bool ConvertY12toY8(Mat &Y12Mat, Mat &Y8Buff)
+{
+ 
+	int frame = 0;
+	if (!IsBuffCreated)
+	{
+		PixelBuff = new uchar[Frame.rows * Frame.cols];
+		IsBuffCreated = true;
+	}
+	int m = 0;
+	Y12Buff = Y12Mat.data;
+	for (int i = 0;i < Y12Mat.rows;i++)
+	{
+		for (int j = 0;j < Y12Mat.cols;j += 2)
+		{
+			PixelBuff[i*Y12Mat.cols + j] = Y12Buff[m];
+			PixelBuff[i*Y12Mat.cols + j + 1] = Y12Buff[m + 1];
+			m += 3;
+		}
+	}
+	
+	Y8Buff = Mat(Y12Mat.rows, Y12Mat.cols, CV_8UC1, PixelBuff);  // convert to Mat from buffer
+	return true;
+}
+
+/** Actual Data format is Y12 (12 bit) after conversion Y12 (16 bit).
+  * Y12 format is decoded with 3 bytes for 2 pixels.
+  * For still capture need to padding 4 bits (i.e. 2 bytes for 1 pixel). 
+ **/
+
+bool ConvertY12forStill(Mat &Y12Mat, uchar* Y12StillBuff)
+{
+	uchar* DataBuff = Y12Mat.data;      // Conversion from Mat data to Array.
+	uchar bPixel1 = 0, bPixel2 = 0;
+	int i = 0;
+	int m = 0;
+	// Looping with Output (Dest.) Buffer
+	int stride = Y12Mat.cols * 2;
+
+	for (int j = 0; j < Y12Mat.rows; j++)
+	{
+            for (int i = 0; i < stride; i += 4)
+            {
+		Y12StillBuff[(stride * j) + i + 1] = ((0XF0 & DataBuff[m]) >> 4);
+
+		bPixel1 = (DataBuff[m] & 0X0F);
+		bPixel2 = (DataBuff[m + 2] & 0X0F);
+		bPixel1 = (bPixel1 << 4);
+
+		Y12StillBuff[(stride * j) + i] = bPixel1 + bPixel2;
+
+		Y12StillBuff[(stride * j) + i + 3] = ((0XF0 & DataBuff[m + 1]) >> 4);
+
+		bPixel1 = (DataBuff[m + 1] & 0X0F);
+		bPixel2 = (DataBuff[m + 2] & 0XF0);
+		bPixel1 = (bPixel1 << 4);
+		bPixel2 = (bPixel2 >> 4);
+
+		Y12StillBuff[(stride * j) + i + 2] = bPixel1 + bPixel2;
+
+		m += 3;
+	    }
+	}
+	return true;
+}
+
+// Write frame data into raw file
+void SaveInRAW(uchar* Buffer, char* buf, int FrameSize)
+{
+	ostringstream filename;
+	filename << buf;
+	std::ofstream outfile(filename.str().c_str(), ios::out | ios::binary);
+	outfile.write((char*)(Buffer), FrameSize);
+	outfile.close();
+	return;
+}
+
 #ifdef _WIN32
 
 //Preview Window for Windows
@@ -149,57 +248,69 @@ void stream()
     bCapture = true;
     while(true)
     {
-        while(bPreviewSet(2, true))
-        {
-            if(bReadSet(2, true))
-            {
-                cap >> Frame;
-            }
+	while(bPreviewSet(2, true))
+	{
+    	if(bReadSet(2, true))
+    	{
+    	    cap >> Frame;
+   	 }
+        if(!Frame.empty())
+         {
+		getCurrentFormat();
+	        if((_12CUNIR) || (_CU51))
+      		{
+      		    //Convert to 8 Bit:
+      		    //Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
+      		    convertScaleAbs(Frame, ResultImage, 0.06226);
 
-            if(!Frame.empty())
-	          {
-        	        if((_12CUNIR) || (_CU51))
-              		{
-              		    //Convert to 8 Bit:
-              		    //Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
-              		    convertScaleAbs(Frame, ResultImage, 0.06226);
+      		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+      		    imshow("OpenCVCam", ResultImage);
+      		}
+      		else if(_CU40)
+      		{
+      		    //Convert to 8 Bit:
+      		    //Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
+      		    convertScaleAbs(Frame, BayerFrame8, 0.249023);
 
-              		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-              		    imshow("OpenCVCam", ResultImage);
-              		}
-              		else if(_CU40)
-              		{
-              		    //Convert to 8 Bit:
-              		    //Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
-              		    convertScaleAbs(Frame, BayerFrame8, 0.249023);
+      		    //Filling the missing G -channel bayer data
+         	    ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
 
-              		    //Filling the missing G -channel bayer data
-                 		    ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
+         	    //Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
+      		    cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
 
-                 		    //Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
-              		    cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+      		    namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
+      		    imshow("OpenCVCam BGR Frame", BGRImage);
 
-              		    namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
-              		    imshow("OpenCVCam BGR Frame", BGRImage);
+      		    namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
+      		    imshow("OpenCVCam IR Frame", IRImage);
+      		}
+		else if (_CU55_MH)
+		{
+			ConvertY12toY8(Frame, ResultImage);
+			namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+			imshow("OpenCVCam", ResultImage);
+		}
+		else if(_20CUG)
+		{
+		       //Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.2490234375
+		       convertScaleAbs(Frame, ResultImage, 0.2490234375);
+          		namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+			imshow("OpenCVCam", ResultImage);
+		}
+      		else
+      		{
+      		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+      		    imshow("OpenCVCam", Frame);
+      		}
+          }
 
-              		    namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
-              		    imshow("OpenCVCam IR Frame", IRImage);
-              		}
-              		else
-              		{
-              		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-              		    imshow("OpenCVCam", Frame);
-              		}
-	          }
-
-            keyPressed = waitKey(10);
-
-            while(bSwitch)
-            {
-                destroyAllWindows();
-            }
-        }
+    keyPressed = waitKey(10);
+    while(bSwitch)
+    {
+        destroyAllWindows();
     }
+   }
+ }
 }
 
 #elif __linux__
@@ -212,59 +323,77 @@ bool closeHID()
 }
 
 //Preview Window for Linux
-//
+
 void *preview(void *arg)
 {
+    static int i = 0;
     bCapture = true;
     while(true)
     {
         while(bPreviewSet(2, true))
         {
+	    i++;
+	    if(i == 2)
+		break;
             if(bReadSet(2, true))
             {
                 cap >> Frame;
             }
 
        	    if(!Frame.empty())
-      	    {
-                		if((_12CUNIR) || (_CU51))
-                		{
-                	      //Convert to 8 Bit:
-                		    //Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
-                		    convertScaleAbs(Frame, ResultImage, 0.06226);
+      	    {			
+		if(callForFormat){  //Flag to check the current format.If Y12 will allow for Conversion in See3CAM_CU55M,else will give Y8 data.
+	                getCurrentFormat();      
+			callForFormat = false;
+		}
+		if((_12CUNIR) || (_CU51))
+		{
+	     	    //Convert to 8 Bit:
+		    //Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
+		    convertScaleAbs(Frame, ResultImage, 0.06226);
+		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+		    imshow("OpenCVCam", ResultImage);
+		}
+		else if(_CU40)
+		{
+		    //Convert to 8 Bit:
+		    //Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
+		    convertScaleAbs(Frame, BayerFrame8, 0.249023);
 
-                		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-                		    imshow("OpenCVCam", ResultImage);
-                		}
-                		else if(_CU40)
-                		{
-                		    //Convert to 8 Bit:
-                		    //Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
-                		    convertScaleAbs(Frame, BayerFrame8, 0.249023);
+		    //Filling the missing G -channel bayer data
+		    ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
 
-                		    //Filling the missing G -channel bayer data
-                		    ConvertRGIR2RGGB(BayerFrame8, BayerFrame8, IRImage);
+		    //Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
+		    cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
 
-                		    //Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
-                		    cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
+		    namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
+		    imshow("OpenCVCam BGR Frame", BGRImage);
 
-                		    namedWindow("OpenCVCam BGR Frame", WINDOW_AUTOSIZE);
-                		    imshow("OpenCVCam BGR Frame", BGRImage);
-
-                		    namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
-                		    imshow("OpenCVCam IR Frame", IRImage);
-                		}
-                		else if(_10CUG_C) //10CUG and other camera's
-                		{
-                		    cvtColor(Frame, BGRImage, COLOR_BayerGB2BGR);
-                		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-                		    imshow("OpenCVCam", BGRImage);
-                		}
-                    else
-                		{
-                		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-                		    imshow("OpenCVCam", Frame);
-                		}
+		    namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
+		    imshow("OpenCVCam IR Frame", IRImage);
+		}
+		else if(_10CUG_C) //10CUG and other camera's
+		{
+		    cvtColor(Frame, BGRImage, COLOR_BayerGB2BGR);
+		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+		    imshow("OpenCVCam", BGRImage);
+		}
+		else if(_CU55M && Y12Format){    // Skip conversion if format is Y8.
+		    ConvertY12toY8(Frame, ResultImage);
+		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+		    imshow("OpenCVCam", ResultImage);	    
+		}
+		else if (_20CUG)
+		{
+		   convertScaleAbs(Frame, ResultImage, 0.2490234375);
+		   namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+		   imshow("OpenCVCam", ResultImage);
+		}
+    		else
+		{	   			 	  
+		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+		    imshow("OpenCVCam", Frame);	   
+		}
       	    }
 
 
@@ -304,7 +433,7 @@ int main()
     //Open a Camera Device
     if(!(listDevices()))
     {
-	      cout << endl << "List Devices Information Failed" << endl;
+        cout << endl << "List Devices Information Failed" << endl;
         cout << endl << '\t' << "Press Any key to exit the Application: " << '\t';
 #ifdef _WIN32
 	      _getch();
@@ -415,9 +544,11 @@ bool listDevices()
       	if((vid == "2560") && (pid == "c140"))
       	{
       	    _CU40 = true;
-                  _CU51 = false;
+             _CU51 = false;
       	    _12CUNIR = false;
       	    _10CUG_C = false;
+             _CU55M = false;
+	     _20CUG = false;
       	}
       	else if((vid == "2560") && (pid == "c152"))
       	{
@@ -425,6 +556,8 @@ bool listDevices()
       	    _CU51 = true;
       	    _12CUNIR = false;
       	    _10CUG_C = false;
+             _CU55M = false;
+	     _20CUG = false;
       	}
       	else if((vid == "2560") && (pid == "c113"))
       	{
@@ -432,6 +565,8 @@ bool listDevices()
       	    _CU51 = false;
       	    _12CUNIR = true;
       	    _10CUG_C = false;
+	     _CU55M = false;
+             _20CUG = false;
       	}
       	else if((vid == "2560") && (pid == "c111"))
       	{
@@ -439,8 +574,27 @@ bool listDevices()
       	    _CU51 = false;
       	    _12CUNIR = false;
       	    _10CUG_C = true;
+	    _CU55M = false;
+  	     _20CUG = false;
       	}
-
+	else if((vid == "2560") && (pid == "c155"))
+      	{
+      	    _CU40 = false;
+      	    _CU51 = false;
+      	    _12CUNIR = false;
+      	    _10CUG_C = false;
+	    _CU55M = true;
+	     _20CUG = false;
+      	}
+	else if ((vid == "2560") && (pid == "c124"))
+	{
+	   _CU40 = false;
+	   _CU51 = false;
+	   _12CUNIR = false;
+	   _10CUG_C = false;
+	   _CU55M = false;
+	   _20CUG = true;
+	}
       	if(cap.isOpened())
       	    cap.release();
 
@@ -452,7 +606,7 @@ bool listDevices()
 	udev = udev_new();
 	if (!udev)
 	{
-      printf("Can't create udev\n");
+      	    printf("Can't create udev\n");
 	    exit(1);
 	}
 	int camdevices = 0, indexId;
@@ -490,7 +644,7 @@ bool listDevices()
                       return 0;
       	    }
       	}
-      	if((vid == "2560") && (pid == "c140") || (pid == "c152") || (pid == "c113") || (pid == "c111"))
+      	if((vid == "2560") && (pid == "c140") || (pid == "c152") || (pid == "c113") || (pid == "c111") || (pid == "c155") || (pid == "c124"))
       	{
       	    cap.set(CV_CAP_PROP_CONVERT_RGB, false);
       	}
@@ -585,6 +739,14 @@ bool configFormats()
 
 	for(int formatList = 0; formatList < formats; formatList++)
 	{
+#ifdef _WIN32
+	    if (_CU55_MH)
+		if (formatList < 4)
+			continue;
+            if (_20CUG)
+		if (formatList > 3 )
+			continue;
+#endif
 	    if(!(cap.getFormatType(formatList, formatType, width, height, fps)))
 	    {
 		cout << endl << "Camera Get Format Type Failed" << endl;
@@ -630,18 +792,30 @@ bool configFormats()
 	    break;
 
 	default:
+	    bPreviewSet(1,false);
 	    bReadSet(1, false);
+#ifdef _WIN32
+	    if (_CU55_MH)
+		index += 4;
+#endif
 	    if(!(cap.setFormatType(index - 3)))
             {
                 cout << endl << "Camera Set Format Type Failed" << endl;
                 return false;
             }
 	    bReadSet(1, true);
+	    bPreviewSet(1,true);
 	    if(cap.getFormatType((index-3), formatType, width, height, fps))
-		cout << "\n\t The Current set Format type = " << formatType << " Width = " << width << " Height = " << height << " FPS = " << fps << "\n\n";
-
+		cout << "\n\t **** The Current set Format type = " << formatType << " Width = " << width << " Height = " << height << " FPS = " << fps << " ****\n\n";
+		current_width = width;
+		current_height = height;
+	     if(formatType == "Y12 ")
+		Y12Format = true;
+	    else		
+		Y12Format = false;
 	    formatType = '\0';
 	    width = height = fps = 0;
+	    IsBuffCreated = false;
 	    break;
 	}
     }
@@ -868,13 +1042,15 @@ bool captureStill()
     struct tm tm;
     localtime_s(&tm, &t);
 
-    if(_CU40)
-    {
-    	num = sprintf_s(buf, "OpenCVCamBGR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
-    	num = sprintf_s(buf1, "OpenCVCamIR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
-    }
-    else
-	    num = sprintf_s(buf, "OpenCVCam%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	if (_CU40)
+	{
+		num = sprintf_s(buf, "OpenCVCamBGR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		num = sprintf_s(buf1, "OpenCVCamIR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	}
+	 else if (_CU55M || _20CUG){
+		sprintf(buf, "%s/OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", cwd,current_width,current_height, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900,tm->tm_hour, tm->tm_min, tm->tm_sec);
+       }else
+	 sprintf(buf, "%s/OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", cwd,current_width,current_height, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900,tm->tm_hour, tm->tm_min, tm->tm_sec);
 
 #elif __linux__
 
@@ -889,8 +1065,11 @@ bool captureStill()
         sprintf(buf, "%s/OpenCVCamBGR%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
         sprintf(buf1, "%s/OpenCVCamIR%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
     }
-    else
-	      sprintf(buf, "%s/OpenCVCam%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+    else if (_CU55M || _20CUG){
+		sprintf(buf, "%s/OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", cwd,current_width,current_height, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900,tm->tm_hour, tm->tm_min, tm->tm_sec);
+    }else
+	 sprintf(buf, "%s/OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", cwd,current_width,current_height, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900,tm->tm_hour, tm->tm_min, tm->tm_sec);
+    
 
 #endif
     if(cap.read(stillFrame))
@@ -922,9 +1101,19 @@ bool captureStill()
               		imwrite(buf1, IRImage);
               		cout << endl << '\t' << buf1 << " image is saved " << endl;
         	    }
+		    else if (_CU55M)
+	  	    {
+			StillBuff = new uchar[stillFrame.cols * stillFrame.rows * 2];
+			ConvertY12forStill(stillFrame, StillBuff);
+			SaveInRAW(StillBuff, buf, (stillFrame.cols * stillFrame.rows * 2));
+		    }
+		    else if (_20CUG)
+		    {
+			SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows * 2));
+		    }
         	    else
         	    {
-        		      imwrite(buf, stillFrame);
+			      imwrite(buf, stillFrame);
         	    }
         	    cout << endl << '\t' << buf << " image is saved " << endl << endl;
       	}

@@ -409,7 +409,7 @@ struct CvCapture_FFMPEG
     void close();
 
     double getProperty(int) const;
-    bool setProperty(int, double);
+    bool setProperty(int, long);
     bool grabFrame();
     bool retrieveFrame(int, unsigned char** data, int* step, int* width, int* height, int* cn);
 
@@ -1256,7 +1256,7 @@ void CvCapture_FFMPEG::seek(double sec)
     seek((int64_t)(sec * get_fps() + 0.5));
 }
 
-bool CvCapture_FFMPEG::setProperty( int property_id, double value )
+bool CvCapture_FFMPEG::setProperty( int property_id, long value )
 {
     if( !video_st ) return false;
 
@@ -2158,7 +2158,7 @@ void cvReleaseCapture_FFMPEG(CvCapture_FFMPEG** capture)
     }
 }
 
-int cvSetCaptureProperty_FFMPEG(CvCapture_FFMPEG* capture, int prop_id, double value)
+int cvSetCaptureProperty_FFMPEG(CvCapture_FFMPEG* capture, int prop_id, long value)
 {
     return capture->setProperty(prop_id, value);
 }

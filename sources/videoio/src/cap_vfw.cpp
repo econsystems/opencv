@@ -100,7 +100,7 @@ public:
     virtual void close();
 
     virtual double getProperty(int) const;
-    virtual bool setProperty(int, double);
+    virtual bool setProperty(int, long);
     virtual bool grabFrame();
     virtual IplImage* retrieveFrame(int);
     virtual int getCaptureDomain() { return CV_CAP_VFW; } // Return the type of the capture object: CV_CAP_VFW, etc...
@@ -263,7 +263,7 @@ double CvCaptureAVI_VFW::getProperty( int property_id ) const
     return 0;
 }
 
-bool CvCaptureAVI_VFW::setProperty( int property_id, double value )
+bool CvCaptureAVI_VFW::setProperty( int property_id, long value )
 {
     switch( property_id )
     {
@@ -326,7 +326,7 @@ public:
     virtual bool open( int index );
     virtual void close();
     virtual double getProperty(int) const;
-    virtual bool setProperty(int, double);
+    virtual bool setProperty(int, long);
     virtual bool grabFrame();
     virtual IplImage* retrieveFrame(int);
     virtual int getCaptureDomain() { return CV_CAP_VFW; } // Return the type of the capture object: CV_CAP_VFW, etc...
@@ -581,7 +581,7 @@ double CvCaptureCAM_VFW::getProperty( int property_id ) const
     return 0;
 }
 
-bool CvCaptureCAM_VFW::setProperty(int property_id, double value)
+bool CvCaptureCAM_VFW::setProperty(int property_id, long value)
 {
     bool handledSize = false;
 
@@ -596,7 +596,9 @@ bool CvCaptureCAM_VFW::setProperty(int property_id, double value)
         handledSize = true;
         break;
     case CV_CAP_PROP_FOURCC:
-        break;
+		fourcc = cvRound(value);
+		handledSize = true;
+		break;
     case CV_CAP_PROP_FPS:
         if( value > 0 )
         {
@@ -693,7 +695,7 @@ public:
     }
 
     virtual bool open( const char* filename, int fourcc,
-                       double fps, CvSize frameSize, bool isColor );
+                       long fps, CvSize frameSize, bool isColor );
     virtual void close();
     virtual bool writeFrame( const IplImage* );
 
@@ -742,7 +744,7 @@ struct BITMAPINFO_8Bit
 };
 
 
-bool CvVideoWriter_VFW::open( const char* filename, int _fourcc, double _fps, CvSize frameSize, bool isColor )
+bool CvVideoWriter_VFW::open( const char* filename, int _fourcc, long _fps, CvSize frameSize, bool isColor )
 {
     close();
 
@@ -857,7 +859,7 @@ bool CvVideoWriter_VFW::writeFrame( const IplImage* image )
 }
 
 CvVideoWriter* cvCreateVideoWriter_VFW( const char* filename, int fourcc,
-                                        double fps, CvSize frameSize, int isColor )
+                                        long fps, CvSize frameSize, int isColor )
 {
     CvVideoWriter_VFW* writer = new CvVideoWriter_VFW;
     if( writer->open( filename, fourcc, fps, frameSize, isColor != 0 ))

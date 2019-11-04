@@ -28,14 +28,14 @@ public:
     virtual ~VideoCapture_DShow();
 
     virtual double getProperty(int propIdx) const;
-    virtual bool setProperty(int propIdx, double propVal);
+    virtual bool setProperty(int propIdx, long propVal);
 
     virtual bool getDevices(int &devices);
     virtual bool getDeviceInfo(int index, String &deviceName, String &vid, String &pid, String &devicePath);
     virtual bool getFormats(int &formats);
     virtual bool getFormatType(int formats, String &formatType, int &width, int &height, int &fps);
-    virtual bool getVideoProperty(int propIdx, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue);
-    virtual bool setVideoProperty(int propIdx, double value, double mode);  
+    virtual bool getVideoProperty(int propIdx, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
+    virtual bool setVideoProperty(int propIdx, long value, long mode);  
     virtual bool grabFrame();
     virtual bool retrieveFrame(int outputType, OutputArray frame);
     virtual int getCaptureDomain();
