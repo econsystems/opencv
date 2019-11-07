@@ -89,6 +89,8 @@
 	* See3CAM_30
 	* See3CAM_81
 	* See3CAM_130 Autofocus
+	* See3CAM_CU55M
+	* See3CAM_20CUG
 
 ## Releases
 

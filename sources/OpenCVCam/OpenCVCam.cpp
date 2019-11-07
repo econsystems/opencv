@@ -1,5 +1,6 @@
 #ifdef _WIN32
 #pragma once
+#define _CRT_SECURE_NO_WARNINGS   // to use scanf instead of scanf_s (scanf_s is not working in Linux).
 #include <Windows.h>
 #include "eCAMFwSw.h"
 #include <SDKDDKVer.h>
@@ -62,15 +63,15 @@ Deinitextensionunit_t deinitextensionunit;
 VideoCapture cap;
 Mat Frame, BayerFrame8, IRImage, BGRImage, ResultImage;
 char keyPressed = '\0', dilemma = 'y';
-int devices = 0, formats = 0, width = 0, current_width =0,current_height =0,height = 0, fps = 0;
+int devices = 0, formats = 0, width = 0, curWidth =0,curHeight =0,height = 0, fps = 0;
 long minimum = 0, maximum = 0, defaultValue = 0, currentValue = 0, steppingDelta = 0, supportedMode = 0, currentMode = 0, value = 0;
 vector< pair <int, String> > uvcProperty;
 unsigned char outputBuffer[BUFFERLENGTH], inputBuffer[BUFFERLENGTH];
 String deviceName, vid, pid, devicePath, formatType;
 bool bOpenHID = false, bCapture, bPreview, bSwitch, _12CUNIR, _CU51, _CU40, _10CUG_C,_CU55M,_20CUG;
 mutex mu;
-uchar* Y12Buff, *PixelBuff,*StillBuff;
-bool IsBuffCreated = false,Y12Format = false,callForFormat = true;
+uchar* Y12Buff, *StillBuff, *PixelBuff = NULL; // PixelBuff is for _CU55M used to convert Y12 to Y8, initial resolution of the device is 640x480..
+bool Y12Format = false, Y16Format = false, checkFormat = true;
 
 #ifdef _WIN32
 
@@ -143,34 +144,34 @@ bool ConvertRGIR2RGGB(Mat BayerRGIR, Mat &BayerRGGB, Mat &IRimage)
     return true;
 }
 
-// To get the current set format, 
+// To get the current set format and Resolution,when application launches.
 bool getCurrentFormat(){
 
-    if(!(cap.getFormatType(0, formatType, width, height, fps)))
-    {
-	cout << endl << "Camera Get Format Type Failed" << endl;
-	return false;
-    }
-    current_width = width;
-    current_height = height;
-    if(formatType == "Y12 ")
-	Y12Format =true;
+	if (!(cap.getFormatType(0, formatType, width, height, fps)))
+	{
+		cout << endl << "Camera Get Format Type Failed" << endl;
+		return false;
+	}
+	curWidth = Frame.cols;
+	curHeight = Frame.rows;
+        if(_CU55M)
+		PixelBuff = new uchar[curWidth * curHeight];
+#if __linux__
+	if (formatType == "Y12 ")
+		Y12Format = true;
+	else if (formatType == "Y16 ")
+		Y16Format = true;
+#endif
+	return true;
 }
 
 /** Converting Y12 format to Y8 for See3CAM_CU55M.
-  * Y12 format is decoded with 3 bytes for 2 pixels. 
-  * Need to skip the 3rd byte everytime in order to get a byte per pixel
- **/
- 
+* Y12 format is decoded with 3 bytes for 2 pixels.
+* Need to skip the 3rd byte everytime in order to get a byte per pixel
+**/
+
 bool ConvertY12toY8(Mat &Y12Mat, Mat &Y8Buff)
 {
- 
-	int frame = 0;
-	if (!IsBuffCreated)
-	{
-		PixelBuff = new uchar[Frame.rows * Frame.cols];
-		IsBuffCreated = true;
-	}
 	int m = 0;
 	Y12Buff = Y12Mat.data;
 	for (int i = 0;i < Y12Mat.rows;i++)
@@ -187,10 +188,10 @@ bool ConvertY12toY8(Mat &Y12Mat, Mat &Y8Buff)
 	return true;
 }
 
-/** Actual Data format is Y12 (12 bit) after conversion Y12 (16 bit).
-  * Y12 format is decoded with 3 bytes for 2 pixels.
-  * For still capture need to padding 4 bits (i.e. 2 bytes for 1 pixel). 
- **/
+/** Actual Data format is Y12 (12 bit, after conversion Y12 (16 bit).
+* Y12 format is decoded with 3 bytes for 2 pixels.
+* For still capture need to padding 4 bits (i.e. 2 bytes for 1 pixel).
+**/
 
 bool ConvertY12forStill(Mat &Y12Mat, uchar* Y12StillBuff)
 {
@@ -238,6 +239,65 @@ void SaveInRAW(uchar* Buffer, char* buf, int FrameSize)
 	outfile.close();
 	return;
 }
+/** 
+  *To get the current format index for CU55M and 20CUG
+  *These two devices we are skipped the Y8 Formats,due to that we need to get the current format index.	
+  */
+int GetCurrentFormatIndex(int Index)
+{
+	String FormatType = "\n";
+	int Width = 0;
+	int Height = 0;
+	int Fps = 0;
+
+	if (!(cap.getFormats(formats)))
+	{
+		cout << endl << "Get Total number of Formats Failed" << endl;
+		return -1;
+	}
+
+	if (!cap.getFormatType(Index, FormatType, Width, Height, Fps))
+	{
+		cout << endl << "Camera Get Format Type Failed" << endl;
+		return -1;
+	}
+
+	for (int formatList = 0; formatList < formats; formatList++)
+	{
+		if (!(cap.getFormatType(formatList, formatType, width, height, fps)))
+		{
+			cout << endl << "Camera Get Format Type Failed" << endl;
+			return -1;
+		}
+		if ((formatType != "Y8") && (Width == width) && (Height == height))
+		{
+			return formatList;
+		}
+	}
+	return -1;
+}
+
+/*
+ *To get the supported formats count except the Y8 formats
+ */
+int GetFormatCountExceptY8()
+{
+	int Count = 0;
+	for (int formatList = 0; formatList < formats; formatList++)
+	{
+		if (!(cap.getFormatType(formatList, formatType, width, height, fps)))
+		{
+			cout << endl << "Camera Get Format Type Failed" << endl;
+			return -1;
+		}
+		if ((formatType != "Y8"))
+		{
+			Count++;
+		}
+	}
+	return Count;
+
+}
 
 #ifdef _WIN32
 
@@ -256,7 +316,10 @@ void stream()
    	 }
         if(!Frame.empty())
          {
-		getCurrentFormat();
+  		if(checkFormat){  // Call getCurrentFormat API,where we will get the initial set format and Resolution. 
+	                getCurrentFormat();      
+			checkFormat = false;  // Make it false,as it is used only once,just to get the initial set values.
+		}
 	        if((_12CUNIR) || (_CU51))
       		{
       		    //Convert to 8 Bit:
@@ -284,7 +347,7 @@ void stream()
       		    namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
       		    imshow("OpenCVCam IR Frame", IRImage);
       		}
-		else if (_CU55_MH)
+		else if (_CU55M)
 		{
 			ConvertY12toY8(Frame, ResultImage);
 			namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
@@ -325,16 +388,12 @@ bool closeHID()
 //Preview Window for Linux
 
 void *preview(void *arg)
-{
-    static int i = 0;
+{   
     bCapture = true;
     while(true)
     {
         while(bPreviewSet(2, true))
         {
-	    i++;
-	    if(i == 2)
-		break;
             if(bReadSet(2, true))
             {
                 cap >> Frame;
@@ -342,9 +401,9 @@ void *preview(void *arg)
 
        	    if(!Frame.empty())
       	    {			
-		if(callForFormat){  //Flag to check the current format.If Y12 will allow for Conversion in See3CAM_CU55M,else will give Y8 data.
-	                getCurrentFormat();      
-			callForFormat = false;
+		if(checkFormat){  // Call getCurrentFormat API,where we will get the initial set format and Resolution. 
+	                getCurrentFormat();     
+			checkFormat = false;  // Make it false,as it is used only once,just to get the initial set values.
 		}
 		if((_12CUNIR) || (_CU51))
 		{
@@ -378,7 +437,7 @@ void *preview(void *arg)
 		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 		    imshow("OpenCVCam", BGRImage);
 		}
-		else if(_CU55M && Y12Format){    // Skip conversion if format is Y8.
+		else if(_CU55M && Y12Format){    // Will allow for the Conversion only if format is Y12.Skip conversion if it is Y8.
 		    ConvertY12toY8(Frame, ResultImage);
 		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 		    imshow("OpenCVCam", ResultImage);	    
@@ -467,7 +526,7 @@ int main()
 
 
 //Listing the Devices
-//
+
 bool listDevices()
 {
     int camId = -1;
@@ -500,11 +559,8 @@ bool listDevices()
       	    cout << endl << "Device " << eachDevice << " Information couldn't be Retrieved" << endl;
       	}
 
-	      cout << '\t' << eachDevice+1 << " . " << deviceName << endl;
-        /*cout << '\t' << eachDevice+1 << " . " << vid << endl;
-        cout << '\t' << eachDevice+1 << " . " << pid << endl;
-        cout << '\t' << eachDevice+1 << " . " << devicePath << endl;*/
-    }
+	 cout << '\t' << eachDevice+1 << " . " << deviceName << endl;
+     }
 
     while((camId < 0) || (camId > devices))
     {
@@ -512,6 +568,7 @@ bool listDevices()
         scanf("%d", &camId);
         while(getchar() != '\n' && getchar() != EOF)
         {
+
         }
     }
 
@@ -730,31 +787,42 @@ bool configFormats()
 	    return false;
 	}
 
-	cout << endl << "Total Number of Formats Supported by the Camera:  " << '\t' << formats << endl;
-
+	#ifdef _WIN32
+		if (_CU55M || _20CUG)
+			cout << endl << "Total Number of Formats Supported by the Camera:  " << '\t' << GetFormatCountExceptY8() << endl;
+		else
+			cout << endl << "Total Number of Formats Supported by the Camera:  " << '\t' << formats << endl;
+#elif _linux_
+		cout << endl << "Total Number of Formats Supported by the Camera:  " << '\t' << formats << endl;
+#endif
         cout << '\t' << "0 - Exit" << endl;
         cout << '\t' << "1 - Back" << endl;
         cout << '\t' << "2 - Main Menu" << endl;
         int option = 3;
 
-	for(int formatList = 0; formatList < formats; formatList++)
-	{
+		for (int formatList = 0; formatList < formats; formatList++)
+		{
+			if (!(cap.getFormatType(formatList, formatType, width, height, fps)))
+			{
+				cout << endl << "Camera Get Format Type Failed" << endl;
+				return false;
+			}
 #ifdef _WIN32
-	    if (_CU55_MH)
-		if (formatList < 4)
-			continue;
-            if (_20CUG)
-		if (formatList > 3 )
-			continue;
+			if (_CU55M || _20CUG)
+				if (formatType == "Y8")
+					continue;
 #endif
-	    if(!(cap.getFormatType(formatList, formatType, width, height, fps)))
-	    {
-		cout << endl << "Camera Get Format Type Failed" << endl;
-		return false;
-	    }
-	    cout << '\t' << option << " . " << "FormatType: " << formatType << " Width: " << width << " Height: " << height << " Fps: " << fps << endl;
-	    option++;
-	}
+			cout << '\t' << option << " . " << "FormatType: " << formatType << " Width: " << width << " Height: " << height << " Fps: " << fps << endl;
+			option++;
+		}
+		while ((index < 0) || (index >= option))
+		{
+			printf("\nPick a choice to set a Particular Preview Format: \t");
+			scanf("%d", &index);
+			while (getchar() != '\n' && getchar() != EOF)
+			{
+			}
+		}
 
 	while((index < 0) || (index >= option))
         {
@@ -791,36 +859,50 @@ bool configFormats()
 	    exploreCam();
 	    break;
 
-	default:
-	    bPreviewSet(1,false);
-	    bReadSet(1, false);
-#ifdef _WIN32
-	    if (_CU55_MH)
-		index += 4;
+		default:
+			bPreviewSet(1, false);
+			bReadSet(1, false);
+#ifdef WIN32
+			if (_CU55M || _20CUG)
+				index = GetCurrentFormatIndex(index - 3);
+			else
+				index = index - 3;
+#elif __linux__
+			index = index - 3;
 #endif
-	    if(!(cap.setFormatType(index - 3)))
-            {
-                cout << endl << "Camera Set Format Type Failed" << endl;
-                return false;
-            }
-	    bReadSet(1, true);
-	    bPreviewSet(1,true);
-	    if(cap.getFormatType((index-3), formatType, width, height, fps))
-		cout << "\n\t **** The Current set Format type = " << formatType << " Width = " << width << " Height = " << height << " FPS = " << fps << " ****\n\n";
-		current_width = width;
-		current_height = height;
-	     if(formatType == "Y12 ")
-		Y12Format = true;
-	    else		
-		Y12Format = false;
-	    formatType = '\0';
-	    width = height = fps = 0;
-	    IsBuffCreated = false;
-	    break;
-	}
-    }
+			if (index == -1)
+			{
+				cout << endl << "Invalid index value to configure the formats" << endl;
+				return false;
+			}
+			if (!(cap.setFormatType(index)))
+			{
+				cout << endl << "Camera Set Format Type Failed" << endl;
+				return false;
+			}
+			if (cap.getFormatType(index, formatType, width, height, fps))
+				cout << "\n\t **** The Current set Format type = " << formatType << " Width = " << width << " Height = " << height << " FPS = " << fps << " ****\n\n";
+			if(_CU55M)
+				PixelBuff = new uchar[width * height];
+			bReadSet(1, true);
+			bPreviewSet(1, true);
 
-    return true;
+			curWidth = width;
+			curHeight = height;
+			if (formatType == "Y12 ")
+				Y12Format = true;
+			else if (formatType == "Y16 ")
+				Y16Format = true;
+			else {
+				Y12Format = false;			
+				Y16Format = false;
+			}
+			formatType = '\0';
+			width = height = fps = 0;
+			break;
+		}
+	}
+	return true;
 }
 
 
@@ -1039,37 +1121,42 @@ bool captureStill()
     Mat stillFrame;
 #ifdef _WIN32
 
-    struct tm tm;
-    localtime_s(&tm, &t);
+	Y12Format = true;   // in windows using only the Y12 and Y16 formats.
+	Y16Format = true;
+
+	struct tm tm;
+	localtime_s(&tm, &t);
 
 	if (_CU40)
 	{
-		num = sprintf_s(buf, "OpenCVCamBGR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
-		num = sprintf_s(buf1, "OpenCVCamIR%d%d%d%d%d%d.jpeg", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		num = sprintf_s(buf, "OpenCVCamBGR_%dx%d_%d%d%d%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		num = sprintf_s(buf1, "OpenCVCamIR_%dx%d_%d%d%d%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 	}
-	 else if (_CU55M || _20CUG){
-		sprintf(buf, "%s/OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", cwd,current_width,current_height, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900,tm->tm_hour, tm->tm_min, tm->tm_sec);
-       }else
-	 sprintf(buf, "%s/OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", cwd,current_width,current_height, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900,tm->tm_hour, tm->tm_min, tm->tm_sec);
+	else if (_CU55M || _20CUG) {
+		num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	}
+	else
+		num = sprintf_s(buf, "OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 #elif __linux__
 
-    struct tm *tm;
-    tm = localtime(&t);
+	struct tm *tm;
+	tm = localtime(&t);
 
     char cwd[256];
     getcwd(cwd, sizeof(cwd));
 
-    if(_CU40)
-    {
-        sprintf(buf, "%s/OpenCVCamBGR%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
-        sprintf(buf1, "%s/OpenCVCamIR%d%d%d%d%d%d.jpeg", cwd, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
-    }
-    else if (_CU55M || _20CUG){
-		sprintf(buf, "%s/OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", cwd,current_width,current_height, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900,tm->tm_hour, tm->tm_min, tm->tm_sec);
-    }else
-	 sprintf(buf, "%s/OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", cwd,current_width,current_height, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900,tm->tm_hour, tm->tm_min, tm->tm_sec);
-    
+	if (_CU40)
+	{
+		sprintf(buf, "%s/OpenCVCamBGR_%dx%d_%d%d%d_%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+		sprintf(buf1, "%s/OpenCVCamIR_%dx%d_%d%d%d%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+	}
+	else if ((_CU55M && Y12Format) || (_20CUG && Y16Format)) {
+		sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+	}
+	else
+		sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+
 
 #endif
     if(cap.read(stillFrame))
@@ -1097,27 +1184,27 @@ bool captureStill()
               		//Actual Bayer format BG but Opencv uses BGR & Not RGB So taking RG Bayer format
               		cvtColor(BayerFrame8, BGRImage, COLOR_BayerRG2BGR);
 
-              		imwrite(buf, BGRImage);
-              		imwrite(buf1, IRImage);
-              		cout << endl << '\t' << buf1 << " image is saved " << endl;
-        	    }
-		    else if (_CU55M)
-	  	    {
-			StillBuff = new uchar[stillFrame.cols * stillFrame.rows * 2];
-			ConvertY12forStill(stillFrame, StillBuff);
-			SaveInRAW(StillBuff, buf, (stillFrame.cols * stillFrame.rows * 2));
-		    }
-		    else if (_20CUG)
-		    {
-			SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows * 2));
-		    }
-        	    else
-        	    {
-			      imwrite(buf, stillFrame);
-        	    }
-        	    cout << endl << '\t' << buf << " image is saved " << endl << endl;
-      	}
-    }
+				imwrite(buf, BGRImage);
+				imwrite(buf1, IRImage);
+				cout << endl << '\t' << buf1 << " image is saved " << endl;
+			}
+			else if (_CU55M && Y12Format)
+			{
+				StillBuff = new uchar[stillFrame.cols * stillFrame.rows * 2];
+				ConvertY12forStill(stillFrame, StillBuff);
+				SaveInRAW(StillBuff, buf, (stillFrame.cols * stillFrame.rows * 2));
+			}
+			else if (_20CUG && Y16Format)
+			{
+				SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows * 2));
+			}
+			else
+			{
+				imwrite(buf, stillFrame);
+			}
+			cout << endl << '\t' << buf << " image is saved " << endl << endl;
+		}
+	}
 
     memset(buf, 0, 240);
     memset(buf1, 0, 240);

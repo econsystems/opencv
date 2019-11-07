@@ -3940,7 +3940,7 @@ bool VideoCapture_DShow::retrieveFrame(int, OutputArray frame)
 	else if (g_VI.getMediasubtype(m_index) == MEDIASUBTYPE_Y16)
 		frame.create(Size(w, h), CV_16UC1);
 	else if (g_VI.getMediasubtype(m_index) == MEDIASUBTYPE_Y12)
-		frame.create(Size(w, h), CV_12UC1);
+		frame.create(Size(w, h), CV_16UC1);
 	else
 	frame.create(Size(w,h), CV_8UC3);
     //Included conditional opencv datatype allocation by e-con - end
