@@ -1,3 +1,4 @@
+
 #ifdef _WIN32
 #pragma once
 #define _CRT_SECURE_NO_WARNINGS   // to use scanf instead of scanf_s (scanf_s is not working in Linux).
@@ -154,8 +155,10 @@ bool getCurrentFormat(){
 	}
 	curWidth = Frame.cols;
 	curHeight = Frame.rows;
-        if(_CU55M)
+
+        if(_CU55M){
 		PixelBuff = new uchar[curWidth * curHeight];
+	}
 #if __linux__
 	if (formatType == "Y12 ")
 		Y12Format = true;
@@ -400,7 +403,7 @@ void *preview(void *arg)
             }
 
        	    if(!Frame.empty())
-      	    {			
+      	    {		
 		if(checkFormat){  // Call getCurrentFormat API,where we will get the initial set format and Resolution. 
 	                getCurrentFormat();     
 			checkFormat = false;  // Make it false,as it is used only once,just to get the initial set values.
@@ -449,12 +452,11 @@ void *preview(void *arg)
 		   imshow("OpenCVCam", ResultImage);
 		}
     		else
-		{	   			 	  
+		{	
 		    namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 		    imshow("OpenCVCam", Frame);	   
 		}
       	    }
-
 
             keyPressed = waitKey(5);
 
@@ -585,7 +587,7 @@ bool listDevices()
       	    cap.release();
 
 #elif __linux__
-
+	
 	bPreviewSet(1, false);
        	if(closeHID())
     	    destroyAllWindows();
@@ -596,6 +598,7 @@ bool listDevices()
 	break;
 
     default:
+	checkFormat = true;
         bPreviewSet(1, false);
       	cap.getDeviceInfo((camId-1), deviceName, vid, pid, devicePath);
       	if((vid == "2560") && (pid == "c140"))
@@ -652,6 +655,15 @@ bool listDevices()
 	   _CU55M = false;
 	   _20CUG = true;
 	}
+	else
+	{
+	   _CU40 = false;
+	   _CU51 = false;
+	   _12CUNIR = false;
+	   _10CUG_C = false;
+	   _CU55M = false;
+	   _20CUG = false;
+	}
       	if(cap.isOpened())
       	    cap.release();
 
@@ -684,7 +696,6 @@ bool listDevices()
 	        break;
       }
       udev_enumerate_unref(enumerate);
-
       udev_unref(udev);
 
 #endif
@@ -963,10 +974,11 @@ bool setVidProp(int Property, string PropStr)
         while(mode == MANUAL)
         {
             cout << endl << "Enter a Valid value to Set " << PropStr << " : " << '\t';
-            scanf("%lf", &value);
+            scanf("%ld", &value);
             while(getchar() != '\n' && getchar() != EOF)
             {
             }
+		
             if( (value >= minimum) && (value <= maximum) && ((((long)value)%((long)steppingDelta)) == 0))
             {
                 break;
@@ -1136,7 +1148,7 @@ bool captureStill()
 		num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 	}
 	else
-		num = sprintf_s(buf, "OpenCVCam%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		num = sprintf_s(buf, "OpenCVCam%dx%d_%d%d%d_%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 #elif __linux__
 

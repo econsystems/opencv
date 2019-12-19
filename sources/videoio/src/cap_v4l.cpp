@@ -1,3 +1,4 @@
+
 /* This is the contributed code:
 
 File:             cvcap_v4l.cpp
@@ -312,10 +313,10 @@ struct CvCaptureCAM_V4L : public CvCapture
    virtual bool getFormatType(int, String &, int &, int &, int &);
    virtual bool setFormatType(int );
 
-   virtual bool getProperty(int, double &, double &, double &, double &, double &, double &, double &) ;
+   virtual bool getProperty(int, long &, long &, long &, long &, long &, long &, long &) ;
    virtual double getProperty(int) const;
-   virtual bool setProperty(int, double);
-   virtual bool setProperty(int, double, double);
+   virtual bool setProperty(int, long);
+   virtual bool setProperty(int, long, long);
    virtual bool grabFrame();
    virtual IplImage* retrieveFrame(int);
 
@@ -372,9 +373,9 @@ static bool icvGrabFrameCAM_V4L( CvCaptureCAM_V4L* capture );
 static IplImage* icvRetrieveFrameCAM_V4L( CvCaptureCAM_V4L* capture, int );
 
 static double icvGetPropertyCAM_V4L( const CvCaptureCAM_V4L* capture, int property_id );
-static bool   icvGetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue);
-static bool   icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, double value, double mode );
-static int    icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, double value );
+static bool   icvGetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue);
+static bool   icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, long value, long mode );
+static int    icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, long value );
 
 /***********************   Implementations  ***************************************/
 
@@ -2011,7 +2012,7 @@ static bool icvSetFormatTypeCAM_V4L(CvCaptureCAM_V4L* capture, int index)
 	return false;
 }
 
-static bool icvGetPropertyCAM_V4L (CvCaptureCAM_V4L* capture, int property_id, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue)
+static bool icvGetPropertyCAM_V4L (CvCaptureCAM_V4L* capture, int property_id, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue)
 {
     bool bSMode1 = false, bSMode2 = false;
     v4l2_format form;
@@ -2291,7 +2292,7 @@ static double icvGetPropertyCAM_V4L (const CvCaptureCAM_V4L* capture,
 
 
 //Added by Chandra Sekar
-static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, double value, double mode)
+static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, long value, long mode)
 {
     v4l2_control control;
     __u32 v4l2id;
@@ -2322,18 +2323,26 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, double val
 	    }
 	}
 
-	if(property_id == CV_CAP_PROP_EXPOSURE)
-	{
-		
+	if(property_id == CV_CAP_PROP_AUTO_EXPOSURE)
+	{		
 		// Set Exposure mode as manual
-        control.id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
+            control.id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
 	    control.value = 1; // 0 - auto mode , 1- manual mode
 		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
 		{
 			perror ("VIDIOC_S_CTRL");
 			return false;
 		}
-			
+	    control.id = capPropertyToV4L2(CV_CAP_PROP_EXPOSURE);
+	    control.value = V4L2_EXPOSURE_MANUAL;
+		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
+		{
+			perror ("VIDIOC_S_CTRL");
+			return false;
+		}
+	}
+	else if(property_id == CV_CAP_PROP_EXPOSURE)
+	{		
 	    control.id = capPropertyToV4L2(CV_CAP_PROP_EXPOSURE);
 	    control.value = V4L2_EXPOSURE_MANUAL;
 		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
@@ -2417,7 +2426,7 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, double val
 	
 
 static bool icvSetControl (CvCaptureCAM_V4L* capture,
-                          int property_id, double value) {
+                          int property_id, long value) {
 
   /* limitation of the input value */
   if (value < 0.0) {
@@ -2463,13 +2472,13 @@ static bool icvSetControl (CvCaptureCAM_V4L* capture,
 }
 
 //Added by Chandra Sekar
-static bool icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, double value, double mode)
+static bool icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, long value, long mode)
 {
     return icvSetControl(capture, property_id, value, mode);
 }
 
 static int icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture,
-                                  int property_id, double value ){
+                                  int property_id, long value ){
     static int width = 0, height = 0;
     bool retval = false;
     bool possible;
@@ -2479,7 +2488,7 @@ static int icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture,
 
     switch (property_id) {
     case CV_CAP_PROP_FRAME_WIDTH:
-        width = cvRound(value);
+        width = cvRound((double)value);
         retval = width != 0;
         if(width !=0 && height != 0) {
             capture->width = width;
@@ -2489,7 +2498,7 @@ static int icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture,
         }
         break;
     case CV_CAP_PROP_FRAME_HEIGHT:
-        height = cvRound(value);
+        height = cvRound((double)value);
         retval = height != 0;
         if(width !=0 && height != 0) {
             capture->width = width;
@@ -2582,17 +2591,17 @@ double CvCaptureCAM_V4L::getProperty( int propId ) const
     return icvGetPropertyCAM_V4L( this, propId );
 }
 
-bool CvCaptureCAM_V4L::getProperty(int propId, double &min, double &max, double &steppingDelta, double &supportedMode, double &currentValue, double &currentMode, double &defaultValue) 
+bool CvCaptureCAM_V4L::getProperty(int propId, long &min, long &max, long &steppingDelta, long &supportedMode, long &currentValue, long &currentMode, long &defaultValue) 
 {
     return icvGetPropertyCAM_V4L( this, propId, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
 }
 
-bool CvCaptureCAM_V4L::setProperty( int propId, double value )
+bool CvCaptureCAM_V4L::setProperty( int propId, long value )
 {
     return icvSetPropertyCAM_V4L( this, propId, value );
 }
 
-bool CvCaptureCAM_V4L::setProperty(int propId, double value, double mode)
+bool CvCaptureCAM_V4L::setProperty(int propId, long value, long mode)
 {
     return icvSetPropertyCAM_V4L( this, propId, value, mode);
 }
