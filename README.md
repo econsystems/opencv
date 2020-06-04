@@ -100,3 +100,4 @@
 
 * OpenCV v1.0.0		-	27-Jul-18
 * OpenCV v1.0.1		-	17-Dec-19
+* OpenCV v1.0.2		-	03-Jun-20

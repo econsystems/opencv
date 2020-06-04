@@ -517,13 +517,13 @@ class videoInput{
 
         //Choose one of these five to setup your device
         bool setupDevice(int deviceID);
-        bool setupDevice(int deviceID, int w, int h);
+        bool setupDevice(int deviceID, int w, int h, int m_fourcc_indexSet);
         bool setupDeviceFourcc(int deviceID, int w, int h,int fourcc);
 
         //These two are only for capture cards
         //USB and Firewire cameras souldn't specify connection
         bool setupDevice(int deviceID, int connection);
-        bool setupDevice(int deviceID, int w, int h, int connection);
+        bool setupDevice(int deviceID, int w, int h, int connection, GUID videoType);
 
         bool setFourcc(int deviceNumber, int fourcc);
 
@@ -642,6 +642,7 @@ class videoInput{
 	static int vHeight[VI_MAX_CAMERAS][255];
 	static int vFps[VI_MAX_CAMERAS][255];
 	static string vFmtType[VI_MAX_CAMERAS][255];
+	static GUID vGUIDType[VI_MAX_CAMERAS][255];
 };
 
 ///////////////////////////  HANDY FUNCTIONS  /////////////////////////////
@@ -1265,10 +1266,12 @@ bool videoInput::setupDevice(int deviceNumber, int _connection){
 //
 // ----------------------------------------------------------------------
 
-bool videoInput::setupDevice(int deviceNumber, int w, int h){
+bool videoInput::setupDevice(int deviceNumber, int w, int h, int fourcc_index){
     if(deviceNumber >= VI_MAX_CAMERAS || VDList[deviceNumber]->readyToCapture) return false;
 
-    setAttemptCaptureSize(deviceNumber,w,h);
+	GUID GUID_Set = vGUIDType[deviceNumber][fourcc_index];
+
+    setAttemptCaptureSize(deviceNumber,w,h, GUID_Set);
     if(setup(deviceNumber))return true;
     return false;
 }
@@ -1301,10 +1304,10 @@ bool videoInput::setupDeviceFourcc(int deviceNumber, int w, int h,int fourcc){
 //
 // ----------------------------------------------------------------------
 
-bool videoInput::setupDevice(int deviceNumber, int w, int h, int _connection){
+bool videoInput::setupDevice(int deviceNumber, int w, int h, int _connection, GUID VideoType){
     if(deviceNumber >= VI_MAX_CAMERAS || VDList[deviceNumber]->readyToCapture) return false;
 
-    setAttemptCaptureSize(deviceNumber,w,h);
+    setAttemptCaptureSize(deviceNumber,w,h, VideoType);
     setPhyCon(deviceNumber, _connection);
     if(setup(deviceNumber))return true;
     return false;
@@ -1390,6 +1393,7 @@ bool videoInput::getFormats(int deviceID, int &formats)
 			vHeight[deviceID][formats] = scc.InputSize.cy;
 			getMediaSubtypeAsString(pmt->subtype, guidstr);
 			vFmtType[deviceID][formats] = guidstr;
+			vGUIDType[deviceID][formats] = pmt->subtype;
 			formats++;
 		    }
 		}			
@@ -1486,6 +1490,8 @@ int videoInput::vWidth[VI_MAX_CAMERAS][255]={{0}};
 int videoInput::vHeight[VI_MAX_CAMERAS][255]={{0}};
 int videoInput::vFps[VI_MAX_CAMERAS][255]={{0}};
 string videoInput::vFmtType[VI_MAX_CAMERAS][255];
+GUID videoInput::vGUIDType[VI_MAX_CAMERAS][255];
+
 
 char * videoInput::getDeviceName(int deviceID){
     if( deviceID >= VI_MAX_CAMERAS ){
@@ -2394,6 +2400,7 @@ bool videoInput::restartDevice(int id){
         int conn         = VDList[id]->storeConn;
         int tmpW           = VDList[id]->width;
         int tmpH           = VDList[id]->height;
+		GUID tVideoType		= VDList[id]->videoType;
 
         bool bFormat    = VDList[id]->specificFormat;
         long format     = VDList[id]->formatType;
@@ -2410,7 +2417,7 @@ bool videoInput::restartDevice(int id){
             VDList[id]->requestedFrameTime = avgFrameTime;
         }
 
-        if( setupDevice(id, tmpW, tmpH, conn) ){
+        if( setupDevice(id, tmpW, tmpH, conn, tVideoType) ){
             //reapply the format - ntsc / pal etc
             if( bFormat ){
                 setFormat(id, format);
@@ -3772,7 +3779,7 @@ bool VideoCapture_DShow::setProperty(int propIdx, long propVal)
             g_VI.stopDevice(m_index);
             g_VI.setIdealFramerate(m_index, fps);
             if (m_widthSet > 0 && m_heightSet > 0)
-                g_VI.setupDevice(m_index, m_widthSet, m_heightSet);
+                g_VI.setupDevice(m_index, m_widthSet, m_heightSet, m_fourcc_indexSet);
             else
                 g_VI.setupDevice(m_index);
         }
@@ -3797,6 +3804,7 @@ bool VideoCapture_DShow::setProperty(int propIdx, long propVal)
             {
                 m_widthSet = m_width;
                 m_heightSet = m_height;
+				m_fourcc_indexSet = m_fourcc;
                 m_width = m_height = m_fourcc = -1;
             }
             return success;

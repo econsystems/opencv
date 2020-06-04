@@ -45,7 +45,7 @@ protected:
     void close();
 
     int m_index, m_width, m_height, m_fourcc;
-    int m_widthSet, m_heightSet;
+    int m_widthSet, m_heightSet, m_fourcc_indexSet;
     static videoInput g_VI;
 };
 
