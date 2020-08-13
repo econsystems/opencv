@@ -76,10 +76,10 @@
 	$ git checkout <opencv version>
 ```
 
-* Replace Videoio module from OpenCV with [this videoio module](https://github.com/econsystems/opencv/tree/master/Sources)
+* Replace Videoio module from OpenCV with [this videoio module](https://github.com/econsystems/opencv/tree/master/Source)
 * Build OpenCV using [this Installation manual](https://github.com/econsystems/opencv/tree/master/Documents)
 * Information on how to use those newly Introduced APIs were [explained in API Documentation](https://github.com/econsystems/opencv/tree/master/Documents)
-* OpenCVCam command line application can be downloaded [from here](https://github.com/econsystems/opencv/tree/master/Sources), which is used to access OpenCV APIs
+* OpenCVCam command line application can be downloaded [from here](https://github.com/econsystems/opencv/tree/master/Source), which is used to access OpenCV APIs
 * Run Sample application using [this user manual](https://github.com/econsystems/opencv/tree/master/Documents)
 
 
