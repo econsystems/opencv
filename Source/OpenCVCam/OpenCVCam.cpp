@@ -2,7 +2,6 @@
 #pragma once
 #define _CRT_SECURE_NO_WARNINGS   // to use scanf instead of scanf_s (scanf_s is not working in Linux).
 #include <Windows.h>
-#include "eCAMFwSw.h"
 #include <SDKDDKVer.h>
 #include <tchar.h>
 #include <string>
@@ -221,7 +220,7 @@ bool ConvertY12toY8(Mat &Y12Mat, Mat &Y8Buff)
 {
 	int m = 0;
 	Y12Buff = Y12Mat.data;
-	cout << "inside the ConvertY12toY8" << endl;
+
 	for (int i = 0; i < Y12Mat.rows; i++)
 	{
 		for (int j = 0; j < Y12Mat.cols; j += 2)
@@ -360,6 +359,7 @@ void stream()
 			keyPressed = waitKey(10);
 			while (bSwitch)
 			{
+				bSwitch = false;
 				destroyAllWindows();
 			}
 		}
@@ -450,6 +450,7 @@ void *preview(void *arg)
 
 			while (bSwitch)
 			{
+				bSwitch = false;
 				destroyAllWindows();
 			}
 		}
@@ -518,6 +519,7 @@ int main()
 
 bool listDevices()
 {
+	checkFormat = true;
 	int camId = -1;
 	//List total Number of Devices
 #ifdef __linux__
@@ -836,6 +838,7 @@ bool configFormats()
 			exploreCam();
 			break;
 		default:
+			bSwitch = true;
 			bPreviewSet(1, false);
 			bReadSet(1, false);
 
@@ -1107,8 +1110,8 @@ bool captureStill()
 	bool IsRAWSelected = false;
 
 #ifdef _WIN32
-struct tm tm;
-localtime_s(&tm, &t);
+	struct tm tm;
+	localtime_s(&tm, &t);
 
 	if (IsRawSaveSupport())
 	{
@@ -1170,44 +1173,44 @@ localtime_s(&tm, &t);
 	getcwd(cwd, sizeof(cwd));
 
 
-  	if (IsRawSaveSupport())
-  	{
-  		int choice = -1;
-  		cout << endl << '\t' << "0 - Back" << endl;
-  		cout << '\t' << "1 - RAW Format" << endl;
-  		cout << '\t' << "2 - RGB Format" << endl;
+	if (IsRawSaveSupport())
+	{
+		int choice = -1;
+		cout << endl << '\t' << "0 - Back" << endl;
+		cout << '\t' << "1 - RAW Format" << endl;
+		cout << '\t' << "2 - RGB Format" << endl;
 
 
-  		while ((choice < 0) || (choice > 2))
-  		{
-  			printf("\n Pick a Relevant Choice to Configure Particular Still capture mode: \t");
-  			scanf("%d", &choice);
-  			while (getchar() != '\n' && getchar() != EOF)
-  			{
-  			}
-  		}
+		while ((choice < 0) || (choice > 2))
+		{
+			printf("\n Pick a Relevant Choice to Configure Particular Still capture mode: \t");
+			scanf("%d", &choice);
+			while (getchar() != '\n' && getchar() != EOF)
+			{
+			}
+		}
 
-  		switch (choice)
-  		{
-  		case 0:
-  			return false;
-  		case 1:
-  			IsRAWSelected = true;
+		switch (choice)
+		{
+		case 0:
+			return false;
+		case 1:
+			IsRAWSelected = true;
 
-  			bPreviewSet(1, false);
-  			cap.set(CV_CAP_PROP_CONVERT_RGB, false);
+			bPreviewSet(1, false);
+			cap.set(CV_CAP_PROP_CONVERT_RGB, false);
 
-        sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+			sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
-  			goto CAPTURE;
-  		case 2:
-  			IsRAWSelected = false;
+			goto CAPTURE;
+		case 2:
+			IsRAWSelected = false;
 
-        sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
+			sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
-  			goto CAPTURE;
-  		}
-  	}
+			goto CAPTURE;
+		}
+	}
 
 	if (_CU40)
 	{

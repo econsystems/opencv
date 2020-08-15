@@ -53,8 +53,7 @@
 
 ## Y8GrabberFilter
 
-* This Y8GrabberFilter, Introduced by e-con systems which can be supported for Y8 Format.
-* With this Y8GrabberFilter you can grab the Y8 frame and from the output node you can get the converted frame to YUY2 Format.
+* The Y8GrabberFilter Transform Filter is to grab the Y8 Frames as SampleGrabber. The SampleGrabber Input Pin does not accept the Y8 Format.
 
 
 ## PythonScript 
@@ -113,7 +112,7 @@
 
 ## Release
 
-* OpenCV v1.0.3		-	13-Aug-20
+* OpenCV v1.0.3		-	15-Aug-20
 * OpenCV v1.0.2		-	03-Jun-20
 * OpenCV v1.0.1		-	17-Dec-19
 * OpenCV v1.0.0		-	27-Jul-18
