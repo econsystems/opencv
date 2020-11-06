@@ -316,7 +316,7 @@ struct CvCaptureCAM_V4L : public CvCapture
 
    virtual bool getProperty(int, int &, int &, int &, int &, int &, int &, int &) ;
    virtual double getProperty(int) const;
-   virtual bool setProperty(int, double);
+   virtual bool setProperty(int, int);
    virtual bool setProperty(int, int, int);
    virtual bool grabFrame();
    virtual IplImage* retrieveFrame(int);
@@ -376,7 +376,7 @@ static IplImage* icvRetrieveFrameCAM_V4L( CvCaptureCAM_V4L* capture, int );
 static double icvGetPropertyCAM_V4L( const CvCaptureCAM_V4L* capture, int property_id );
 static bool   icvGetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, int &min, int &max, int &steppingDelta, int &supportedMode, int &currentValue, int &currentMode, int &defaultValue);
 
-static int    icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, double value );
+static int    icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, int value );
 
 static bool   icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, int value, int mode );
 /***********************   Implementations  ***************************************/
@@ -2513,7 +2513,7 @@ static bool icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, i
 }
 
 static int icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture,
-                                  int property_id, double value ){
+                                  int property_id, int value ){
     static int width = 0, height = 0;
     bool retval = false;
     bool possible;
@@ -2631,7 +2631,7 @@ bool CvCaptureCAM_V4L::getProperty(int propId, int &min, int &max, int &stepping
     return icvGetPropertyCAM_V4L( this, propId, min, max, steppingDelta, supportedMode, currentValue, currentMode, defaultValue);
 }
 
-bool CvCaptureCAM_V4L::setProperty( int propId, double value )
+bool CvCaptureCAM_V4L::setProperty( int propId, int value )
 {
     return icvSetPropertyCAM_V4L( this, propId, value );
 }

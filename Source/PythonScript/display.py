@@ -1,9 +1,10 @@
 import threading
 import sys
 import cv2
+import numpy as np
 from conversion import Conversion
 from capture import Capture
-
+from time import sleep
 
 class Display:
     '''
@@ -17,7 +18,7 @@ class Display:
     frame_width = 0
     frame_height = 0
     frame_format = ''
-
+    
     @staticmethod
     def start_display(cap, current_format, device_name):
         '''
@@ -47,24 +48,34 @@ class Display:
         while True:
             while not Display.stop_thread:
                 ret, frame = cap.read()
-                if Capture.capture_flag:
-                    Capture.capture_image(frame, cls.frame_format, cap)
-                    continue
+                if not (np.sum(frame) == None):
+                    if Capture.capture_flag:
+                        ret, Stillframe = cap.read()
+                        if not (np.sum(Stillframe) == None):
+                            Capture.capture_image(Stillframe, cls.frame_format, cap)
+                            continue
 
-                if cls.frame_format == Conversion.V4L2_PIX_FMT_Y12 or cls.frame_format == Conversion.V4L2_PIX_FMT_Y16:
-                    if Conversion.y16CameraFlag == Conversion.SEE3CAM_CU40:
-                        new_frame, IR_frame = Conversion.convert_frame(frame, cls.frame_format)
-                        cv2.namedWindow('IR Frame', cv2.WINDOW_NORMAL)
-                        cv2.resizeWindow('IR Frame', cls.frame_width, cls.frame_height)
-                        cv2.imshow('IR Frame', IR_frame)
-                    else:
+                    if cls.frame_format == Conversion.V4L2_PIX_FMT_Y12 or cls.frame_format == Conversion.V4L2_PIX_FMT_Y16:
+                        if Conversion.y16CameraFlag == Conversion.SEE3CAM_CU40:
+                            new_frame, IR_frame = Conversion.convert_frame(frame, cls.frame_format)
+                            cv2.namedWindow('IR Frame', cv2.WINDOW_NORMAL)
+                            cv2.resizeWindow('IR Frame', cls.frame_width, cls.frame_height)
+                            cv2.imshow('IR Frame', IR_frame)
+                        else:
+                            new_frame = Conversion.convert_frame(frame, cls.frame_format)
+                    elif cls.frame_format == "UYVY" or cls.frame_format == "YUY2":
                         new_frame = Conversion.convert_frame(frame, cls.frame_format)
+                    else:
+                        new_frame = frame
+                        
+                    cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
+                    cv2.resizeWindow('Frame', cls.frame_width, cls.frame_height)
+                                       
+                    cv2.imshow('Frame', new_frame)
+                    cv2.waitKey(1)
                 else:
-                    new_frame = frame
-                cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
-                cv2.resizeWindow('Frame', cls.frame_width, cls.frame_height)
-                cv2.imshow('Frame', new_frame)
-                cv2.waitKey(1)
+                    print("Null Frame Received...")
+                        
             if Display.kill_thread:
                 cv2.destroyAllWindows()
                 break
@@ -81,6 +92,7 @@ class Display:
         if not Display.stop_thread:
             if Display.display_thread.is_alive():
                 Display.stop_thread = True
+                sleep(0.3)
                 if sys.platform == "linux":
                     Display.display_thread.join()
         if sys.platform == "linux":

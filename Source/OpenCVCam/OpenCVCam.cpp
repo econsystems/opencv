@@ -48,7 +48,7 @@ using namespace cv;
 #define AUTOANDMANUAL			3
 #define	READFIRMWAREVERSION		0X40
 #define BUFFERLENGTH			65
-#define SDK_VERSION			"1.0.0"
+#define SDK_VERSION			"1.0.3"
 
 #ifdef _WIN32
 
@@ -432,7 +432,7 @@ void *preview(void *arg)
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				else if (_20CUG)
+				else if (_20CUG && Y16Format)
 				{
 					convertScaleAbs(Frame, ResultImage, 0.2490234375);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
@@ -692,7 +692,7 @@ bool listDevices()
 #ifdef _WIN32
 		if (cap.open(camId - 1))
 #elif __linux__
-		if (cap.open(indexId))
+		if (cap.open(camId - 1))
 #endif
 		{
 			if (!cap.isOpened())
@@ -745,8 +745,11 @@ bool listDevices()
 			PID = udev_device_get_sysattr_value(dev, "idProduct");
 
 			if ((vid == VID) && (pid == PID))
+			{
 				devicePath = hidPath;
-
+				udev_device_unref(dev);
+				break;
+			}
 			udev_device_unref(dev);
 		}
 
@@ -825,10 +828,12 @@ bool configFormats()
 				cap.release();
 
 #elif __linux__
-
+			bSwitch = true;
 			bPreviewSet(1, false);
 			if (closeHID())
 				destroyAllWindows();
+			if (cap.isOpened())
+				cap.release();
 
 #endif
 			exit(0);
@@ -1162,7 +1167,7 @@ bool captureStill()
 		num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 	}
 	else
-		num = sprintf_s(buf, "OpenCVCam%dx%d_%d%d%d_%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 #elif __linux__
 
@@ -1227,6 +1232,9 @@ bool captureStill()
 #endif
 
 CAPTURE:
+#ifdef __linux__
+	bReadSet(1, false);
+#endif
 	if (cap.read(stillFrame))
 	{
 		if (!stillFrame.empty())
@@ -1280,6 +1288,9 @@ CAPTURE:
 				else
 				{
 					imwrite(buf, stillFrame);
+#ifdef __linux__
+					bReadSet(1, true);
+#endif
 				}
 			}
 			cout << endl << '\t' << buf << " image is saved " << endl << endl;

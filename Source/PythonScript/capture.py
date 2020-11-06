@@ -1,10 +1,11 @@
 import threading
 import os
 import cv2
+import numpy as np
 import display
 from conversion import Conversion
 from datetime import datetime
-
+from time import sleep
 
 class Capture:
     '''
@@ -12,8 +13,11 @@ class Capture:
     '''
 
     capture_flag = False
-    convert_RGB_Selected = False
+    convert_to_RAW_Selected = False
+    convert_to_RGB_Selected = False
     capture_thread = threading.Thread()
+    caprure_done = True
+    StillCapturingImage = False
 
     @staticmethod
     def capture_image(frame, frame_format, cap):
@@ -25,17 +29,26 @@ class Capture:
         :return: True.
         '''
 
-        Capture.capture_flag = False
-        if Capture.convert_RGB_Selected:
-            display.Display:stop_display()
-            cap.set(cv2.CAP_PROP_CONVERT_RGB, True)
-            display.Display:resume_display()
-            
-        if not Capture.capture_thread.is_alive():
-            Capture.capture_thread = threading.Thread(target=Capture.convert_image, args=(frame, frame_format,),
-                                                      daemon=True)
-            Capture.capture_thread.start()
-        return True
+        if not (np.sum(frame) == None):
+            if Capture.caprure_done:
+                Capture.caprure_done = False
+                Capture.capture_flag = False
+                if Capture.convert_to_RAW_Selected:
+                    if not (frame_format == "UYVY") | (frame_format == "YUY2") | (frame_format == "Y8  "):
+                        display.Display:stop_display()
+                        cap.set(cv2.CAP_PROP_CONVERT_RGB, True)
+                        display.Display:resume_display()
+
+                    
+                if not Capture.capture_thread.is_alive():
+                    Capture.capture_thread = threading.Thread(target=Capture.convert_image, args=(frame, frame_format,),
+                                                              daemon=True)
+                    Capture.capture_thread.start()
+                #Capture.convert_image(frame, frame_format)
+                return True
+            else:
+                print("Previous Capture was not done")
+                return True
 
     @staticmethod
     def convert_image(frame, frame_format):
@@ -45,9 +58,16 @@ class Capture:
         :param frame: The frame which needs to be converted
         :param frame_format: The format of the frame. for ex: YUYV, MJPG, etc
         '''
-        if Capture.convert_RGB_Selected:
-            Capture.convert_RGB_Selected = False
+        
+        if frame_format == "Y8  ":
+           image = frame.data
+           Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
+            
+        
+        elif Capture.convert_to_RAW_Selected:
+            Capture.convert_to_RAW_Selected = False
             image = frame
+                
             Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
 
         elif frame_format == Conversion.V4L2_PIX_FMT_Y16:
@@ -63,7 +83,12 @@ class Capture:
             image = Conversion.convert_y12_for_still(frame)
             Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
         else:
-            image = frame
+            if frame_format == "UYVY":
+                image = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_UYVY, 3)
+            elif frame_format == "YUY2":
+                image = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_YUY2, 3)
+            else:
+                image = frame
             Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.jpg')
 
     @staticmethod
@@ -81,11 +106,12 @@ class Capture:
                 or False - when image is not saved.
         '''
 
-        time = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+        time = datetime.now().strftime("%d%m%Y_%H%M%S")
         if frame_format == Conversion.V4L2_PIX_FMT_Y12 or frame_format == Conversion.V4L2_PIX_FMT_Y16:
             frame_format = frame_format[:-1]  # slicing the string to remove space("Y16 ") in y12 and y16.
 
         file_name = f"{os.getcwd()}/OpenCVCam_{ir}image_{frame_format}_{height}x{width}_{time}{image_format}"
+            
         if image_format == '.raw':  # since raw file write is not supported by imwrite, we are using file write
             try:
                 fp = open(file_name, 'wb+')
@@ -96,4 +122,6 @@ class Capture:
                 return False
         else:
             cv2.imwrite(file_name, image)
+        Capture.caprure_done = True
+        Capture.StillCapturingImage = False
         return True

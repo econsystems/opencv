@@ -7,13 +7,14 @@ import uvc
 from capture import Capture
 from device import Device
 from input import get_integer
+from time import sleep
 
 import cv2
 
 
 def intro():
     print(" E-con's OpenCV Python Application ".center(100, "*"))
-    print('OpenCV Python App Version = 1.0.1'.center(100, " "))
+    print('OpenCV Python App Version = 1.0.3'.center(100, " "))
     if sys.platform == "linux":
         print("Running in Linux Platform")
     elif sys.platform == "win32":
@@ -82,19 +83,20 @@ class MainClass:
             5: self.hid_control_menu,
         }
         while True:
-            print("\n\t0.EXIT\n\t1.BACK \n\t2.UVC CONTROLS\n\t3.FORMAT SETTINGS\n\t4.CAPTURE STILL"
-                  "IMAGE")
-            if self.Is_HID_Opened:      # Should disable the HID Controls option for non e-con devices.
-                print("\t5.HID PROPERTIES")
-                choice = get_integer("Enter Your Option:", min(main_menu_opt, key=int), max(main_menu_opt, key=int))
-            else:
-                choice = get_integer("Enter Your Option:", min(main_menu_opt, key=int), max(main_menu_opt, key=int)-1)
-            func = main_menu_opt.get(choice, lambda: "Invalid Selection")
-            # main_menu_opt.get will return the Method name corresponding to the choice value.
-            # for ex: if choice is 1, it will return self.main_menu_init
-            if not func():
-                self.main_menu_exit()
-
+            if not Capture.StillCapturingImage:
+                choice = -1
+                print("\n\t0.EXIT\n\t1.BACK \n\t2.UVC CONTROLS\n\t3.FORMAT SETTINGS\n\t4.CAPTURE STILL IMAGE")
+                if self.Is_HID_Opened:      # Should disable the HID Controls option for non e-con devices.
+                    print("\t5.HID PROPERTIES")
+                    choice = get_integer("Enter Your Option:", min(main_menu_opt, key=int), max(main_menu_opt, key=int))
+                else:
+                    choice = get_integer("Enter Your Option:", min(main_menu_opt, key=int), max(main_menu_opt, key=int)-1)
+                func = main_menu_opt.get(choice, lambda: "Invalid Selection")
+                # main_menu_opt.get will return the Method name corresponding to the choice value.
+                # for ex: if choice is 1, it will return self.main_menu_init
+                if not func():
+                    self.main_menu_exit()
+                    
     def hid_control_menu(self):
         '''
         method name: hid_control_menu
@@ -121,11 +123,13 @@ class MainClass:
         description: This method enables the flag which is used to capture image.
         :return: True.
         '''
-        
+        Capture.StillCapturingImage = True
         if self.format.IsRawSaveSupport():
             print("\n\t1.BACK\n\t2.RAW FORMAT\n\t3.RGB FORMAT")
             choice = get_integer("Enter Your Option:", 1, 3)
+                
             if choice == 1:
+                Capture.StillCapturingImage = False
                 return True
             if choice == 2:
                 print("\tSaving Raw image to the current working directory...")
@@ -133,13 +137,13 @@ class MainClass:
                     self.display2.stop_display()
                 self.cap.set(cv2.CAP_PROP_CONVERT_RGB, False)
                 Capture.capture_flag = True
-                Capture.convert_RGB_Selected = True
+                Capture.convert_to_RAW_Selected = True
                 if sys.platform == "win32":
                     self.display2.resume_display()
             if choice == 3:
                 print("\tSaving image to the current working directory...")
                 Capture.capture_flag = True
-
+                Capture.convert_to_RGB_Selected = True
         else:
             print("\tSaving image to the current working directory...")
             Capture.capture_flag = True

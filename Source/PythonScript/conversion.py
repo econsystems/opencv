@@ -14,7 +14,8 @@ class Conversion:
 
     V4L2_PIX_FMT_Y16 = "Y16 "
     V4L2_PIX_FMT_Y12 = "Y12 "
-
+    format_type = 0
+    
     y16CameraFlag = -1  # flag which denotes type of y16 camera.
     y8_frame = None
 
@@ -30,8 +31,8 @@ class Conversion:
         :type device_name:  str
         '''
 
-        format_type, width, height, fps = current_format
-        if format_type == cls.V4L2_PIX_FMT_Y16:
+        cls.format_type, width, height, fps = current_format
+        if cls.format_type == cls.V4L2_PIX_FMT_Y16:
             if device_name.find("See3CAM_20CUG") > -1:
                 cls.y16CameraFlag = cls.SEE3CAM_20CUG
             elif device_name.find("See3CAM_CU40") > -1:
@@ -53,6 +54,10 @@ class Conversion:
         :return: the converted frame
         :rtype: Mat
         '''
+        if cls.format_type == "UYVY":
+            return cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_UYVY)
+        if cls.format_type == "YUY2":
+            return cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_YUY2)
 
         convert_func = {
             "Y12 ": cls.convert_y12_to_y8,
@@ -159,3 +164,4 @@ class Conversion:
 
         rgb_frame = cv2.cvtColor(bayer_RGGB, cv2.COLOR_BayerRG2BGR)
         return rgb_frame, ir_frame
+
