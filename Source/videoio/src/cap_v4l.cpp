@@ -2049,123 +2049,124 @@ static bool icvSetFormatTypeCAM_V4L(CvCaptureCAM_V4L* capture, int index)
 
 static bool icvGetPropertyCAM_V4L (CvCaptureCAM_V4L* capture, int property_id, int &min, int &max, int &steppingDelta, int &supportedMode, int &currentValue, int &currentMode, int &defaultValue)
 {
-    bool bSMode1 = false, bSMode2 = false;
+    bool auto_mode = false, manual_mode = false;
+    short int auto_mode_value = -1;
     v4l2_format form;
     memset(&form, 0, sizeof(v4l2_format));
     form.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (-1 == ioctl (capture->deviceHandle, VIDIOC_G_FMT, &form))
     {
-	perror ("VIDIOC_G_FMT");
-	return -1;
+	      perror ("VIDIOC_G_FMT");
+	       return -1;
     }
 
     v4l2_control control;
 
     if(!((property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U) || (property_id == CV_CAP_PROP_FOCUS) || (property_id == CV_CAP_PROP_EXPOSURE)))
     {
-	__u32 v4l2id = capPropertyToV4L2(property_id);
+	     __u32 v4l2id = capPropertyToV4L2(property_id);
 
-	if(v4l2id == __u32(-1))
-	{
-  	    //fprintf(stderr, "VIDEOIO ERROR: V4L2: getting property #%d is not supported\n", property_id);
-	    return false;
-	}
+	      if(v4l2id == __u32(-1))
+	      {
+  	        //fprintf(stderr, "VIDEOIO ERROR: V4L2: getting property #%d is not supported\n", property_id);
+	           return false;
+	      }
 
-	capture->queryctrl = v4l2_queryctrl();
-	capture->queryctrl.id = v4l2id;
+	      capture->queryctrl = v4l2_queryctrl();
+	      capture->queryctrl.id = v4l2id;
 
-	if(0 != ioctl(capture->deviceHandle, VIDIOC_QUERYCTRL, &capture->queryctrl))
-	{
-	    if (errno != EINVAL)
-	        perror ("VIDIOC_QUERYCTRL");
-	    return false;
-	}
+	       if(0 != ioctl(capture->deviceHandle, VIDIOC_QUERYCTRL, &capture->queryctrl))
+	        {
+	           if (errno != EINVAL)
+	            perror ("VIDIOC_QUERYCTRL");
+	           return false;
+	        }
 
-	control.id = v4l2id;
-	if (-1 == ioctl (capture->deviceHandle, VIDIOC_G_CTRL, &control))
-	{
-	    switch (property_id)
-	    {
-	    case CV_CAP_PROP_BRIGHTNESS:
-	        break;
-	    case CV_CAP_PROP_CONTRAST:
-		break;
-    	    case CV_CAP_PROP_SATURATION:
-		break;
-	    case CV_CAP_PROP_HUE:
-		break;
-	    case CV_CAP_PROP_GAIN:
-		break;
-	    case CV_CAP_PROP_SHARPNESS:
-		break;
-	    case CV_CAP_PROP_GAMMA:
-		break;
-	    case CV_CAP_PROP_BACKLIGHT:
-		break;
-	    case CV_CAP_PROP_ZOOM:
-		break;
-	    case CV_CAP_PROP_PAN:
-	  	break;
-	    case CV_CAP_PROP_TILT:
-		break;
-	    }
-	    return false;
-	}
-	bSMode2 = true;
+	        control.id = v4l2id;
+	        if (-1 == ioctl (capture->deviceHandle, VIDIOC_G_CTRL, &control))
+	        {
+	           switch (property_id)
+	           {
+	              case CV_CAP_PROP_BRIGHTNESS:
+	               break;
+	              case CV_CAP_PROP_CONTRAST:
+		              break;
+    	          case CV_CAP_PROP_SATURATION:
+		              break;
+	              case CV_CAP_PROP_HUE:
+		              break;
+	              case CV_CAP_PROP_GAIN:
+		              break;
+	              case CV_CAP_PROP_SHARPNESS:
+		              break;
+	              case CV_CAP_PROP_GAMMA:
+		              break;
+	              case CV_CAP_PROP_BACKLIGHT:
+		              break;
+	              case CV_CAP_PROP_ZOOM:
+		              break;
+	              case CV_CAP_PROP_PAN:
+	  	            break;
+	              case CV_CAP_PROP_TILT:
+		              break;
+	           }
+	           return false;
+	       }
+	       manual_mode = true;
     }
     else
     {
-	__u32 v4l2id1;
-	__u32 v4l2id = capPropertyToV4L2(property_id);
+	     __u32 v4l2id1;
+	     __u32 v4l2id = capPropertyToV4L2(property_id);
 
-	if(property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U)
-	    v4l2id1 = capPropertyToV4L2(CV_CAP_PROP_AUTO_WHITE_BALANCE);
-	else if(property_id == CV_CAP_PROP_FOCUS)
-	    v4l2id1 = capPropertyToV4L2(CV_CAP_PROP_AUTOFOCUS);
-	else
-	    v4l2id1 = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
+	     if(property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U)
+	       v4l2id1 = capPropertyToV4L2(CV_CAP_PROP_AUTO_WHITE_BALANCE);
+	     else if(property_id == CV_CAP_PROP_FOCUS)
+         v4l2id1 = capPropertyToV4L2(CV_CAP_PROP_AUTOFOCUS);
+       else
+	       v4l2id1 = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
 
-	if(v4l2id == __u32(-1))
-	{
-	    fprintf(stderr, "VIDEOIO ERROR: V4L2: getting property #%d is not supported\n", property_id);
-	    return false;
-	}
+	     if(v4l2id == __u32(-1))
+	     {
+	        fprintf(stderr, "VIDEOIO ERROR: V4L2: getting property #%d is not supported\n", property_id);
+	        return false;
+	     }
 
-	if(v4l2id1 == __u32(-1))
-	{
-	    fprintf(stderr, "VIDEOIO ERROR: V4L2: getting property #%d is not supported\n", property_id);
-	    return false;
-	}
+	      if(v4l2id1 == __u32(-1))
+	      {
+	         fprintf(stderr, "VIDEOIO ERROR: V4L2: getting property #%d is not supported\n", property_id);
+	         return false;
+	      }
 
-	capture->queryctrl = v4l2_queryctrl();
-	capture->queryctrl.id = v4l2id1;
-	if(0 != ioctl(capture->deviceHandle, VIDIOC_QUERYCTRL, &capture->queryctrl))
-	{
-	    if (errno != EINVAL)
-	    perror ("VIDIOC_QUERYCTRL");
-	}
+        capture->queryctrl = v4l2_queryctrl();
+        capture->queryctrl.id = v4l2id1; //Auto control id
+        if(0 != ioctl(capture->deviceHandle, VIDIOC_QUERYCTRL, &capture->queryctrl))//querying Auto controls
+        {
+          if (errno != EINVAL)
+          perror ("VIDIOC_QUERYCTRL");
+        }
 
-	control.id = v4l2id1;
-	if (-1 != ioctl (capture->deviceHandle, VIDIOC_G_CTRL, &control))
-	{
-	    bSMode1 = true;
-	}
+        control.id = v4l2id1; //getting auto controls,if value =0 then manual mode.if value =1 then auto mode
+        if (-1 != ioctl (capture->deviceHandle, VIDIOC_G_CTRL, &control))
+        {
+          auto_mode = true;
+          auto_mode_value = control.value;
+        }
+	        capture->queryctrl = v4l2_queryctrl();
+	        capture->queryctrl.id = v4l2id;
 
-	capture->queryctrl = v4l2_queryctrl();
-	capture->queryctrl.id = v4l2id;
+	        if(0 != ioctl(capture->deviceHandle, VIDIOC_QUERYCTRL, &capture->queryctrl))
+	        {
+	           if (errno != EINVAL)
+	               perror ("VIDIOC_QUERYCTRL");
+	        }
 
-	if(0 != ioctl(capture->deviceHandle, VIDIOC_QUERYCTRL, &capture->queryctrl))
-	{
-	    if (errno != EINVAL)
-	    perror ("VIDIOC_QUERYCTRL");
-	}
-
-	control.id = v4l2id;
-	if (-1 != ioctl (capture->deviceHandle, VIDIOC_G_CTRL, &control))
-	{
-	bSMode2 = true;
-	}
-    }
+	        control.id = v4l2id;
+	        if (-1 != ioctl (capture->deviceHandle, VIDIOC_G_CTRL, &control))
+	        {
+	           manual_mode = true;
+	        }
+      }
 
     min = capture->queryctrl.minimum;
     max = capture->queryctrl.maximum;
@@ -2173,25 +2174,40 @@ static bool icvGetPropertyCAM_V4L (CvCaptureCAM_V4L* capture, int property_id, i
     steppingDelta = capture->queryctrl.step;
     defaultValue = capture->queryctrl.default_value;
 
-    if((bSMode1 == true) && (bSMode2 == true))
+    if((auto_mode == true) && (manual_mode == true))
     {
- 	supportedMode = 3;
-	(bCurrMode1 == true) ? (currentMode = 1) : (currentMode = 2);
+ 	    supportedMode = 3;
+      switch(property_id)
+      {
+        case CV_CAP_PROP_WHITE_BALANCE_BLUE_U  : (auto_mode_value == 1)?(currentMode = 1) : (currentMode = 2);
+                                                  break;
+        case CV_CAP_PROP_EXPOSURE:             (auto_mode_value == 0)?(currentMode = 1) : (currentMode = 2);
+                                                break;
+         case CV_CAP_PROP_FOCUS:                (auto_mode_value == 1)?(currentMode = 1) : (currentMode = 2);
+                                               break;
+        default: printf("\nInvalid control %d",auto_mode_value);
+                 return false;
+
+      }
+	    //(bCurrMode1 == true) ? (currentMode = 1) : (currentMode = 2);
+
     }
-    else if(bSMode1 == true)
+    else if(auto_mode == true)
     {
-	currentMode = 1;
-	supportedMode = 1;
+	     currentMode = 1;
+	     supportedMode = 1;
     }
-    else if(bSMode2 == true)
+    else if(manual_mode == true)
     {
-	currentMode = 2;
-	supportedMode = 2;
+	     currentMode = 2;
+	     supportedMode = 2;
     }
     else
-	return false;
+	     return false;
 
-    return true;
+   // printf("\nauto_mode: %d ,manual_mode: %d",auto_mode,manual_mode );
+   // printf("\nsupportedMode: %d currentMode: %d",supportedMode,currentMode );
+     return true;
 }
 
 static double icvGetPropertyCAM_V4L (const CvCaptureCAM_V4L* capture,
@@ -2334,119 +2350,122 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, int value,
 
     if(mode == 2)
     {
-  	if(property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U)
-	{
- 	    v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTO_WHITE_BALANCE);
-	    v4l2_control wcontrol = {v4l2id, 0};
+  	   if(property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U)
+	     {
+ 	        v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTO_WHITE_BALANCE);
+	        v4l2_control wcontrol = {v4l2id, 0};
 
-	    if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &wcontrol) && errno != ERANGE)
-	    {
-   		perror ("VIDIOC_S_CTRL");
-	       	return false;
-	    }
-	}
+	        if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &wcontrol) && errno != ERANGE)
+	        {
+   		       perror ("VIDIOC_S_CTRL");
+	       	    return false;
+	        }
+	     }
 
-	if(property_id == CV_CAP_PROP_FOCUS)
-	{
-	    v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTOFOCUS);
-	    v4l2_control fcontrol = {v4l2id, 0};
+	     if(property_id == CV_CAP_PROP_FOCUS)
+	     {
+	        v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTOFOCUS);
+	        v4l2_control fcontrol = {v4l2id, 0};
 
-	    if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &fcontrol) && errno != ERANGE)
-	    {
-	    	perror ("VIDIOC_S_CTRL");
-	       	return false;
-	    }
-	}
+	        if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &fcontrol) && errno != ERANGE)
+	        {
+	    	      perror ("VIDIOC_S_CTRL");
+	       	    return false;
+	        }
+	     }
 
-	if(property_id == CV_CAP_PROP_AUTO_EXPOSURE)
-	{
-		// Set Exposure mode as manual
-            control.id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
-	    control.value = 1; // 0 - auto mode , 1- manual mode
-		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
-		{
-			perror ("VIDIOC_S_CTRL");
-			return false;
-		}
-	    control.id = capPropertyToV4L2(CV_CAP_PROP_EXPOSURE);
-	    control.value = V4L2_EXPOSURE_MANUAL;
-		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
-		{
-			perror ("VIDIOC_S_CTRL");
-			return false;
-		}
-	}
-	else if(property_id == CV_CAP_PROP_EXPOSURE)
-	{
-	    control.id = capPropertyToV4L2(CV_CAP_PROP_EXPOSURE);
-	    control.value = V4L2_EXPOSURE_MANUAL;
-		if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
-		{
-			perror ("VIDIOC_S_CTRL");
-			return false;
-		}
-	}
+	     if(property_id == CV_CAP_PROP_AUTO_EXPOSURE)
+	     {
+		       // Set Exposure mode as manual
+           control.id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
+	         control.value = 1; // 0 - auto mode , 1- manual mode
+		       if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
+		       {
+			          perror ("VIDIOC_S_CTRL");
+			          return false;
+		       }
+	         control.id = capPropertyToV4L2(CV_CAP_PROP_EXPOSURE);
+	         control.value = int(value);
+		       if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
+		       {
+			          perror ("VIDIOC_S_CTRL");
+			          return false;
+		        }
+	      }
+	      if(property_id == CV_CAP_PROP_EXPOSURE)
+	      {
+	         control.id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
+	         control.value = V4L2_EXPOSURE_MANUAL;
+		       if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
+		       {
+			          perror ("VIDIOC_S_CTRL");
+			          return false;
+		       }
+	      }
 
-	v4l2id = capPropertyToV4L2(property_id);
+	       v4l2id = capPropertyToV4L2(property_id);
 
-	if(v4l2id == __u32(-1))
-	{
-	    fprintf(stderr, "VIDEOIO ERROR: V4L2: setting property #%d is not supported\n", property_id);
-	    return -1;
-	}
+	       if(v4l2id == __u32(-1))
+	       {
+	          fprintf(stderr, "VIDEOIO ERROR: V4L2: setting property #%d is not supported\n", property_id);
+	          return -1;
+	       }
 
-	control.id = v4l2id;
-	control.value = int(value);
+	       control.id = v4l2id;
+         control.value = int(value);
 
-	if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
-	{
-	    perror ("VIDIOC_S_CTRL");
-	    return false;
-	}
-	bCurrMode1 = false;
-	bCurrMode2 = true;
+	        if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
+	        {
+	           perror ("VIDIOC_S_CTRL");
+	           return false;
+	        }
+	        bCurrMode1 = false;
+	        bCurrMode2 = true;
     }
     else
     {
-	Range range;
-	if(property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U)
-	{
+	     Range range;
+	     if(property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U)
+	     {
      	    v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTO_WHITE_BALANCE);
-	    range = capture->getRange(CV_CAP_PROP_WHITE_BALANCE_BLUE_U);
-	}
-	else if(property_id == CV_CAP_PROP_EXPOSURE)
-	{
-	    v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
-	    range = capture->getRange(CV_CAP_PROP_EXPOSURE);
-	}
-	else if(property_id == CV_CAP_PROP_FOCUS)
-	{
-	    v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTOFOCUS);
-	    range = capture->getRange(CV_CAP_PROP_FOCUS);
-	}
+	        range = capture->getRange(CV_CAP_PROP_WHITE_BALANCE_BLUE_U);
+	     }
+	     else if(property_id == CV_CAP_PROP_EXPOSURE)
+	     {
+	        v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
+	        range = capture->getRange(CV_CAP_PROP_EXPOSURE);
+	     }
+	     else if(property_id == CV_CAP_PROP_FOCUS)
+	     {
+	        v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTOFOCUS);
+	        range = capture->getRange(CV_CAP_PROP_FOCUS);
+	     }
 
-	if(v4l2id == __u32(-1))
-	{
-	    fprintf(stderr, "VIDEOIO ERROR: V4L2: setting property #%d is not supported\n", property_id);
-	    return -1;
-	}
+	     if(v4l2id == __u32(-1))
+	     {
+	        fprintf(stderr, "VIDEOIO ERROR: V4L2: setting property #%d is not supported\n", property_id);
+	         return -1;
+       }
 
    	/* scale the value we want to set */
-    	value = range.size() + range.start;
+    	//value = range.size() + range.start;
 
-	if((property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U) || (property_id == CV_CAP_PROP_FOCUS))
-	    value = 1;
-
+	      if((property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U) || (property_id == CV_CAP_PROP_FOCUS))
+	          value = 1;
+        else
+            value = 0 ;
 	/* set which control we want to set */
-	v4l2_control bcontrol = {v4l2id, int(value)};
+	     v4l2_control bcontrol;
+       bcontrol.id= v4l2id;
+       bcontrol.value = int(value);
 
-	if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &bcontrol) && errno != ERANGE)
-	{
-	    perror ("VIDIOC_S_CTRL");
-	    return false;
-	}
-	bCurrMode1 = true;
-	bCurrMode2 = false;
+	     if ((-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &bcontrol) )&& (errno != ERANGE))
+	     {
+	        perror ("VIDIOC_S_CTRL");
+	        return false;
+	     }
+	     bCurrMode1 = true;
+	     bCurrMode2 = false;
     }
     if(control.id == V4L2_CID_EXPOSURE_AUTO && control.value == V4L2_EXPOSURE_MANUAL)
     {
@@ -2514,6 +2533,7 @@ static bool icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, i
 
 static int icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture,
                                   int property_id, int value ){
+
     static int width = 0, height = 0;
     bool retval = false;
     bool possible;
@@ -2541,6 +2561,8 @@ static int icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture,
             retval = v4l2_reset(capture);
             width = height = 0;
         }
+
+
         break;
     case CV_CAP_PROP_FPS:
         capture->fps = value;
