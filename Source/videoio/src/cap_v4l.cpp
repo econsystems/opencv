@@ -2068,7 +2068,7 @@ static bool icvGetPropertyCAM_V4L (CvCaptureCAM_V4L* capture, int property_id, i
 
 	      if(v4l2id == __u32(-1))
 	      {
-  	        //fprintf(stderr, "VIDEOIO ERROR: V4L2: getting property #%d is not supported\n", property_id);
+  	        fprintf(stderr, "VIDEOIO ERROR: V4L2: getting property #%d is not supported\n", property_id);
 	           return false;
 	      }
 
@@ -2203,7 +2203,7 @@ static bool icvGetPropertyCAM_V4L (CvCaptureCAM_V4L* capture, int property_id, i
 	     supportedMode = 2;
     }
     else
-	     return false;
+      return false;
 
    // printf("\nauto_mode: %d ,manual_mode: %d",auto_mode,manual_mode );
    // printf("\nsupportedMode: %d currentMode: %d",supportedMode,currentMode );
@@ -2350,7 +2350,13 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, int value,
 
     if(mode == 2)
     {
-  	   if(property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U)
+      int min,max,steppingDelta,supportedMode,currentValue,currentMode,defaultValue;
+      if(!icvGetPropertyCAM_V4L(capture,property_id,min, max,steppingDelta,supportedMode,currentValue,currentMode,defaultValue))//Added by M.Vishnu Murali: if auto control is not supported skip and set manual control.
+       {
+         printf("\nFailed to get supportedModes.");
+         return false;
+       }
+  	   if(property_id == CV_CAP_PROP_WHITE_BALANCE_BLUE_U && supportedMode !=2)
 	     {
  	        v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTO_WHITE_BALANCE);
 	        v4l2_control wcontrol = {v4l2id, 0};
@@ -2362,7 +2368,7 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, int value,
 	        }
 	     }
 
-	     if(property_id == CV_CAP_PROP_FOCUS)
+	     if(property_id == CV_CAP_PROP_FOCUS && supportedMode !=2)
 	     {
 	        v4l2id = capPropertyToV4L2(CV_CAP_PROP_AUTOFOCUS);
 	        v4l2_control fcontrol = {v4l2id, 0};
@@ -2374,7 +2380,7 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, int value,
 	        }
 	     }
 
-	     if(property_id == CV_CAP_PROP_AUTO_EXPOSURE)
+	     if(property_id == CV_CAP_PROP_EXPOSURE && supportedMode !=2)
 	     {
 		       // Set Exposure mode as manual
            control.id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
@@ -2384,24 +2390,9 @@ static bool icvSetControl(CvCaptureCAM_V4L* capture, int property_id, int value,
 			          perror ("VIDIOC_S_CTRL");
 			          return false;
 		       }
-	         control.id = capPropertyToV4L2(CV_CAP_PROP_EXPOSURE);
-	         control.value = int(value);
-		       if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
-		       {
-			          perror ("VIDIOC_S_CTRL");
-			          return false;
-		        }
+
 	      }
-	      if(property_id == CV_CAP_PROP_EXPOSURE)
-	      {
-	         control.id = capPropertyToV4L2(CV_CAP_PROP_AUTO_EXPOSURE);
-	         control.value = V4L2_EXPOSURE_MANUAL;
-		       if (-1 == ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &control) && errno != ERANGE)
-		       {
-			          perror ("VIDIOC_S_CTRL");
-			          return false;
-		       }
-	      }
+
 
 	       v4l2id = capPropertyToV4L2(property_id);
 
