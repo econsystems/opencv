@@ -2,7 +2,7 @@
 
 ## Videoio Module
 
-* This Videoio Module can be supported for both Opencv version 3.3.1 and 3.4.1 with both Linux and Windows OS.
+* This Videoio Module can be supported for  Opencv version 4.5.5 with both Linux and Windows OS.
 
 ### APIs Introduced
 
@@ -118,7 +118,7 @@
 
 ## Release
 
-* OpenCV v1.0.4		-	03-Aug-22
+* OpenCV v1.0.4		-	10-Oct-22
 * OpenCV v1.0.3		-	15-Aug-20
 * OpenCV v1.0.2		-	03-Jun-20
 * OpenCV v1.0.1		-	17-Dec-19
