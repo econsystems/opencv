@@ -44,6 +44,7 @@
 //
 
 #include "precomp.hpp"
+#include "cap_interface.hpp"
 
 #ifdef HAVE_PVAPI
 #if !defined _WIN32 && !defined _LINUX
@@ -81,11 +82,11 @@ public:
 
     virtual bool open( int index );
     virtual void close();
-    virtual double getProperty(int) const;
-    virtual bool setProperty(int, double);
-    virtual bool grabFrame();
-    virtual IplImage* retrieveFrame(int);
-    virtual int getCaptureDomain()
+    virtual double getProperty(int) const CV_OVERRIDE;
+    virtual bool setProperty(int, int) CV_OVERRIDE;
+    virtual bool grabFrame() CV_OVERRIDE;
+    virtual IplImage* retrieveFrame(int) CV_OVERRIDE;
+    virtual int getCaptureDomain() CV_OVERRIDE
     {
         return CV_CAP_PVAPI;
     }
@@ -314,7 +315,7 @@ double CvCaptureCAM_PvAPI::getProperty( int property_id ) const
     return -1.0;
 }
 
-bool CvCaptureCAM_PvAPI::setProperty( int property_id, double value )
+bool CvCaptureCAM_PvAPI::setProperty( int property_id, int value )
 {
     tPvErr error;
 
@@ -599,12 +600,12 @@ bool CvCaptureCAM_PvAPI::resizeCaptureFrame (int frameWidth, int frameHeight)
     return true;
 }
 
-CvCapture* cvCreateCameraCapture_PvAPI( int index )
+cv::Ptr<cv::IVideoCapture> cv::create_PvAPI_capture( int index )
 {
     CvCaptureCAM_PvAPI* capture = new CvCaptureCAM_PvAPI;
 
     if ( capture->open( index ))
-        return capture;
+        return cv::makePtr<cv::LegacyCapture>(capture);
 
     delete capture;
     return NULL;

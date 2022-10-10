@@ -43,7 +43,7 @@ class Device:
             print("cap.open Failed")
             return None
         iFormatType ="".join([chr((int(cap.get(cv2.CAP_PROP_FOURCC)) >> 8 * i) & 0xFF) for i in range(4)])
-        if ((iFormatType == "UYVY") | (iFormatType == "YUY2")):
-            if not cap.set(cv2.CAP_PROP_CONVERT_RGB, False):
+        if ((iFormatType == "UYVY") | (iFormatType == "YUY2") | (iFormatType == "Y16 ")):
+            if not cap.set(cv2.CAP_PROP_CONVERT_RGB, 0):
                 print("Setting RGB flag as False")
         return device_name, vid, pid, device_path

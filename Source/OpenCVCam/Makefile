@@ -1,8 +1,7 @@
 CC = g++
 CFLAGS = -ggdb -std=c++0x 
 RM = rm -f
-LDFLAGS = `pkg-config --cflags --libs opencv` -lpthread -ludev
-
+LDFLAGS = `pkg-config --cflags --libs opencv4` -lpthread -ludev -lopencv_world
 default:	
 	@$(CC) $(CFLAGS) OpenCVCam.cpp -o OpenCVCam $(LDFLAGS)
 

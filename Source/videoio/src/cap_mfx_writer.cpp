@@ -5,9 +5,48 @@
 #include "cap_mfx_writer.hpp"
 #include "opencv2/core/base.hpp"
 #include "cap_mfx_common.hpp"
+#include "opencv2/imgproc/hal/hal.hpp"
+#include "cap_interface.hpp"
 
 using namespace std;
 using namespace cv;
+
+static float estimateBitrate(int codecId, size_t pixelNum, float fps)
+{
+    float bitrate = 0.f;
+    const float mp = pixelNum / 1000000.f;
+    if (codecId == MFX_CODEC_MPEG2)
+    {
+        bitrate = (mp * 43) * fps + 360;
+    }
+    else if (codecId == MFX_CODEC_AVC)
+    {
+        bitrate = (mp * 140 + 19) * pow(fps, 0.60f);
+    }
+    else if (codecId == MFX_CODEC_HEVC)
+    {
+        bitrate = (mp * 63 + 45) * pow(fps, 0.60f);
+    }
+    else
+    {
+        MSG(cerr << "MFX encoder Bitrate estimation FAILED" << endl);
+    }
+    DBG(cout << "MFX encoder Bitrate estimation (" << mp << " MP x " << fps << " fps): " << bitrate << endl);
+    return bitrate;
+
+}
+
+static size_t getBitrateDivisor()
+{
+    static const size_t res = utils::getConfigurationParameterSizeT("OPENCV_VIDEOIO_MFX_BITRATE_DIVISOR", 300);
+    return res;
+}
+
+static mfxU32 getWriterTimeoutMS()
+{
+    static const size_t res = utils::getConfigurationParameterSizeT("OPENCV_VIDEOIO_MFX_WRITER_TIMEOUT", 1);
+    return saturate_cast<mfxU32>(res * 1000); // convert from seconds
+}
 
 inline mfxU32 codecIdByFourCC(int fourcc)
 {
@@ -29,7 +68,7 @@ inline mfxU32 codecIdByFourCC(int fourcc)
 }
 
 VideoWriter_IntelMFX::VideoWriter_IntelMFX(const String &filename, int _fourcc, double fps, Size frameSize_, bool)
-    : session(0), plugin(0), deviceHandler(0), bs(0), encoder(0), pool(0), frameSize(frameSize_), good(false)
+    : session(0), plugin(0), deviceHandler(0), bs(0), encoder(0), pool(0), outSurface(NULL), frameSize(frameSize_), good(false)
 {
     mfxStatus res = MFX_ERR_NONE;
 
@@ -39,9 +78,15 @@ VideoWriter_IntelMFX::VideoWriter_IntelMFX(const String &filename, int _fourcc, 
         return;
     }
 
+    if (fps <= 0)
+    {
+        MSG(cerr << "MFX: Invalid FPS passed to encoder" << endl);
+        return;
+    }
+
     // Init device and session
     deviceHandler = createDeviceHandler();
-    session = new MFXVideoSession();
+    session = new MFXVideoSession_WRAP();
     if (!deviceHandler->init(*session))
     {
         MSG(cerr << "MFX: Can't initialize session" << endl);
@@ -70,7 +115,7 @@ VideoWriter_IntelMFX::VideoWriter_IntelMFX(const String &filename, int _fourcc, 
     memset(&params, 0, sizeof(params));
     params.mfx.CodecId = codecId;
     params.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
-    params.mfx.TargetKbps = (mfxU16)cvRound(frameSize.area() * fps / 500); // TODO: set in options
+    params.mfx.TargetKbps = saturate_cast<mfxU16>(estimateBitrate(codecId, frameSize.area(), (float)fps) * 300 / getBitrateDivisor()); // TODO: set in options
     params.mfx.RateControlMethod = MFX_RATECONTROL_VBR;
     params.mfx.FrameInfo.FrameRateExtN = cvRound(fps * 1000);
     params.mfx.FrameInfo.FrameRateExtD = 1000;
@@ -102,7 +147,7 @@ VideoWriter_IntelMFX::VideoWriter_IntelMFX(const String &filename, int _fourcc, 
 
     // Init encoder
     res = encoder->Init(&params);
-    DBG(cout << "MFX Init: " << res << endl << params.mfx.FrameInfo);
+    DBG(cout << "MFX encoder Init: " << res << endl << params.mfx.FrameInfo);
     if (res < MFX_ERR_NONE)
     {
         MSG(cerr << "MFX: Failed to init encoder: " << res << endl);
@@ -150,7 +195,7 @@ double VideoWriter_IntelMFX::getProperty(int) const
     return 0;
 }
 
-bool VideoWriter_IntelMFX::setProperty(int, double)
+bool VideoWriter_IntelMFX::setProperty(int, int)
 {
     MSG(cerr << "MFX: setProperty() is not implemented" << endl);
     return false;
@@ -164,26 +209,6 @@ bool VideoWriter_IntelMFX::isOpened() const
 void VideoWriter_IntelMFX::write(cv::InputArray input)
 {
     write_one(input);
-}
-
-inline static void to_nv12(cv::InputArray bgr, cv::Mat & Y, cv::Mat & UV)
-{
-    const int height = bgr.rows();
-    const int width = bgr.cols();
-    Mat yuv;
-    cvtColor(bgr, yuv, CV_BGR2YUV_I420);
-    CV_Assert(yuv.isContinuous());
-    Mat Y_(Y, Rect(0, 0, width, height));
-    yuv.rowRange(0, height).copyTo(Y_);
-    Mat UV_planar(height, width / 2, CV_8UC1, yuv.ptr(height));
-    Mat u_and_v[2] = {
-        UV_planar.rowRange(0, height / 2),
-        UV_planar.rowRange(height / 2, height),
-    };
-    Mat uv;
-    cv::merge(u_and_v, 2, uv);
-    Mat UV_(UV, Rect(0, 0, width, height / 2));
-    uv.reshape(1).copyTo(UV_);
 }
 
 bool VideoWriter_IntelMFX::write_one(cv::InputArray bgr)
@@ -209,13 +234,11 @@ bool VideoWriter_IntelMFX::write_one(cv::InputArray bgr)
             MSG(cerr << "MFX: Failed to get free surface" << endl);
             return false;
         }
-        const int rows = workSurface->Info.Height;
-        const int cols = workSurface->Info.Width;
-        Mat Y(rows, cols, CV_8UC1, workSurface->Data.Y, workSurface->Data.Pitch);
-        Mat UV(rows / 2, cols, CV_8UC1, workSurface->Data.UV, workSurface->Data.Pitch);
-        to_nv12(bgr, Y, UV);
-        CV_Assert(Y.ptr() == workSurface->Data.Y);
-        CV_Assert(UV.ptr() == workSurface->Data.UV);
+        Mat src = bgr.getMat();
+        hal::cvtBGRtoTwoPlaneYUV(src.data, src.step,
+                                 workSurface->Data.Y, workSurface->Data.UV, workSurface->Data.Pitch,
+                                 workSurface->Info.CropW, workSurface->Info.CropH,
+                                 3, false, 1);
     }
 
     while (true)
@@ -225,7 +248,7 @@ bool VideoWriter_IntelMFX::write_one(cv::InputArray bgr)
         res = encoder->EncodeFrameAsync(NULL, workSurface, &bs->stream, &sync);
         if (res == MFX_ERR_NONE)
         {
-            res = session->SyncOperation(sync, 1000); // 1 sec, TODO: provide interface to modify timeout
+            res = session->SyncOperation(sync, getWriterTimeoutMS()); // TODO: provide interface to modify timeout
             if (res == MFX_ERR_NONE)
             {
                 // ready to write
@@ -254,7 +277,7 @@ bool VideoWriter_IntelMFX::write_one(cv::InputArray bgr)
         else if (res == MFX_WRN_DEVICE_BUSY)
         {
             DBG(cout << "Waiting for device" << endl);
-            sleep(1);
+            sleep_ms(1000);
             continue;
         }
         else
@@ -265,10 +288,12 @@ bool VideoWriter_IntelMFX::write_one(cv::InputArray bgr)
     }
 }
 
-Ptr<VideoWriter_IntelMFX> VideoWriter_IntelMFX::create(const String &filename, int _fourcc, double fps, Size frameSize, bool isColor)
+Ptr<IVideoWriter> cv::create_MFX_writer(const std::string& filename, int _fourcc, double fps,
+                                        const Size& frameSize, const VideoWriterParameters& params)
 {
     if (codecIdByFourCC(_fourcc) > 0)
     {
+        const bool isColor = params.get(VIDEOWRITER_PROP_IS_COLOR, true);
         Ptr<VideoWriter_IntelMFX> a = makePtr<VideoWriter_IntelMFX>(filename, _fourcc, fps, frameSize, isColor);
         if (a->isOpened())
             return a;

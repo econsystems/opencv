@@ -14,7 +14,7 @@ import cv2
 
 def intro():
     print(" E-con's OpenCV Python Application ".center(100, "*"))
-    print('OpenCV Python App Version = 1.0.3'.center(100, " "))
+    print('OpenCV Python App Version = 1.0.4'.center(100, " "))
     if sys.platform == "linux":
         print("Running in Linux Platform")
     elif sys.platform == "win32":
@@ -61,8 +61,9 @@ class MainClass:
         self.format = format.Format(self.cap, self.device_name)
         self.display2.start_display(self.cap, self.format.get_current_format(), self.device_name)
         self.uvc_obj.get_supported_controls()
+
         if not self.hid.init_hid(self.vid, self.pid, self.device_path):
-            print("\tHid initialisation Failed")
+            # print("\tHid initialisation Failed")
             self.Is_HID_Opened = False
         else:
             self.Is_HID_Opened = True
@@ -96,7 +97,7 @@ class MainClass:
                 # for ex: if choice is 1, it will return self.main_menu_init
                 if not func():
                     self.main_menu_exit()
-                    
+
     def hid_control_menu(self):
         '''
         method name: hid_control_menu
@@ -127,7 +128,7 @@ class MainClass:
         if self.format.IsRawSaveSupport():
             print("\n\t1.BACK\n\t2.RAW FORMAT\n\t3.RGB FORMAT")
             choice = get_integer("Enter Your Option:", 1, 3)
-                
+
             if choice == 1:
                 Capture.StillCapturingImage = False
                 return True
@@ -135,7 +136,7 @@ class MainClass:
                 print("\tSaving Raw image to the current working directory...")
                 if sys.platform == "win32":
                     self.display2.stop_display()
-                self.cap.set(cv2.CAP_PROP_CONVERT_RGB, False)
+                self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
                 Capture.capture_flag = True
                 Capture.convert_to_RAW_Selected = True
                 if sys.platform == "win32":

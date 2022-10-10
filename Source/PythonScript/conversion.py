@@ -33,7 +33,7 @@ class Conversion:
 
         cls.format_type, width, height, fps = current_format
         if cls.format_type == cls.V4L2_PIX_FMT_Y16:
-            if device_name.find("See3CAM_20CUG") > -1:
+            if device_name.find("See3CAM_20CUG") > -1  or device_name.find("See3CAM_CU135MH") > -1 or device_name.find("See3CAM_CU135M_H03R1") > -1:
                 cls.y16CameraFlag = cls.SEE3CAM_20CUG
             elif device_name.find("See3CAM_CU40") > -1:
                 cls.y16CameraFlag = cls.SEE3CAM_CU40
@@ -78,7 +78,8 @@ class Conversion:
         '''
 
         raw_bytes = frame.tobytes()#converting two dimensional mat data to byte array
-        row, column = frame.shape
+        row = frame.shape[0]
+        column = frame.shape[1]
         filtered_bytes = np.frombuffer(raw_bytes, dtype=np.uint8)
         filtered_bytes = np.reshape(filtered_bytes, (-1, 3))
         filtered_bytes = np.delete(filtered_bytes,2,1)

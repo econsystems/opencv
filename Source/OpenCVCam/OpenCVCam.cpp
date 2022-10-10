@@ -48,7 +48,7 @@ using namespace cv;
 #define AUTOANDMANUAL			3
 #define	READFIRMWAREVERSION		0X40
 #define BUFFERLENGTH			65
-#define SDK_VERSION			"1.0.3"
+#define SDK_VERSION			"1.0.4"
 
 #ifdef _WIN32
 
@@ -67,6 +67,10 @@ Deinitextensionunit_t deinitextensionunit;
 
 #endif
 
+#ifndef V4L2_CAP_META_CAPTURE
+#define V4L2_CAP_META_CAPTURE    0x00800000  /* Specified in kernel header v4.16 */
+#endif // V4L2_CAP_META_CAPTURE
+
 //Variable Declarations
 VideoCapture cap;
 Mat Frame, BayerFrame8, IRImage, BGRImage, ResultImage;
@@ -75,10 +79,10 @@ int devices = 0, formats = 0, width = 0, curWidth = 0, curHeight = 0, height = 0
 int minimum = 0, maximum = 0, defaultValue = 0, currentValue = 0, steppingDelta = 0, supportedMode = 0, currentMode = 0, value = 0;
 vector< pair <int, String> > uvcProperty;
 unsigned char outputBuffer[BUFFERLENGTH], inputBuffer[BUFFERLENGTH];
-String deviceName, vid, pid, devicePath, formatType;
-bool bOpenHID = false, bCapture, bPreview, bSwitch, _12CUNIR, _CU51, _CU40, _10CUG_C, _CU55M, _20CUG;
+String deviceName, vid, pid, devicePath, formatType, CurrFormatType;
+bool bOpenHID = false, bCapture, bPreview, bSwitch, _12CUNIR, _CU51, _CU40, _10CUG_C, _CU55M, _20CUG, _CU135;
 mutex mu;
-uchar* Y12Buff, *StillBuff, *PixelBuff = NULL; // PixelBuff is for _CU55M used to convert Y12 to Y8, initial resolution of the device is 640x480..
+uchar* Y12Buff,*Y16Buff, *StillBuff, *PixelBuff = NULL; // PixelBuff is for _CU55M used to convert Y12 to Y8, initial resolution of the device is 640x480..
 bool Y12Format = true, Y16Format = true, checkFormat = true;
 
 #ifdef _WIN32
@@ -87,6 +91,7 @@ TCHAR *tDevicePath;
 HINSTANCE hinstLib;
 bool bDetach = false;
 thread t;
+
 
 #elif __linux__
 
@@ -99,7 +104,6 @@ pthread_t threadId;
 //Function Declarations
 bool listDevices();
 bool exploreCam();
-
 
 bool bReadSet(int tid, bool bRead)
 {
@@ -169,9 +173,9 @@ String DwordToFourCC(double fcc)
 // To get weather the format is raw supported or not
 bool IsRawSaveSupport()
 {
-	String Format = DwordToFourCC(cap.get(CV_CAP_PROP_FOURCC));
+	String Format = DwordToFourCC(cap.get(CAP_PROP_FOURCC/*CV_CAP_PROP_FOURCC*/));
 
-	if (Format.substr(0, 4) == "UYVY" || Format.substr(0, 4) == "YUY2" || Format.substr(0, 4) == "Y8" || Format.substr(0, 4) == "YUYV" || Format.substr(0, 4) == "Y16" || Format.substr(0, 4) == "Y12")
+	if (Format.substr(0, 4) == "UYVY" || Format.substr(0, 4) == "YUY2" || Format.substr(0, 2) == "Y8" || Format.substr(0, 4) == "YUYV" || Format.substr(0, 3) == "Y16")
 		return true;
 	return false;
 }
@@ -179,18 +183,18 @@ bool IsRawSaveSupport()
 // To get the current set format and Resolution,when application launches.
 bool getCurrentFormat() {
 
-	formatType = DwordToFourCC(cap.get(CV_CAP_PROP_FOURCC));
+	formatType = DwordToFourCC(cap.get(CAP_PROP_FOURCC/*CV_CAP_PROP_FOURCC*/));
 
 	curWidth = Frame.cols;
 	curHeight = Frame.rows;
 
 #ifdef _WIN32
-	if (formatType == "Y12")
+	if (formatType.substr(0,3) == "Y12")
 		Y12Format = true;
 	else
 		Y12Format = false;
 
-	if (formatType == "Y16")
+	if (formatType.substr(0, 3) == "Y16")
 		Y16Format = true;
 	else
 		Y16Format = false;
@@ -287,6 +291,7 @@ void SaveInRAW(uchar* Buffer, char* buf, int FrameSize)
 	return;
 }
 
+
 #ifdef _WIN32
 
 //Preview Window for Windows
@@ -318,7 +323,7 @@ void stream()
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				else if (_CU40)
+				else if (_CU40) 
 				{
 					//Convert to 8 Bit:
 					//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
@@ -342,13 +347,29 @@ void stream()
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				else if (_20CUG && Y16Format)
+				else if ((_CU135 || _20CUG) && (Y16Format)) // included _CU135
 				{
 					//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.2490234375
 					convertScaleAbs(Frame, ResultImage, 0.2490234375);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
+				#ifdef _WIN32
+				// added for UYVY format stream with appropriate conversions 
+				else if (formatType.substr(0, 4) =="UYVY")
+				{
+					cvtColor(Frame, ResultImage, COLOR_YUV2BGR_UYVY);
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", ResultImage);
+				}
+				// added for YUY2 format stream with appropriate conversions
+				else if (formatType.substr(0, 4) == "YUY2")
+				{
+					cvtColor(Frame, ResultImage, COLOR_YUV2BGR_YUY2);
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", ResultImage);
+				}
+				#endif
 				else
 				{
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
@@ -432,12 +453,29 @@ void *preview(void *arg)
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				else if (_20CUG && Y16Format)
+				else if ((_CU135 || _20CUG) && (Y16Format)) // included _CU135
 				{
+					//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.2490234375
 					convertScaleAbs(Frame, ResultImage, 0.2490234375);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
+				#ifdef _WIN32
+				// added for UYVY format stream with appropriate conversions 
+				else if (formatType.substr(0, 4) =="UYVY")
+				{
+					cvtColor(Frame, ResultImage, COLOR_YUV2BGR_UYVY);
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", ResultImage);
+				}
+				// added for YUY2 format stream with appropriate conversions
+				else if (formatType.substr(0, 4) == "YUY2")
+				{
+					cvtColor(Frame, ResultImage, COLOR_YUV2BGR_YUY2);
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", ResultImage);
+				}
+				#endif
 				else
 				{
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
@@ -588,8 +626,18 @@ bool listDevices()
 
 	default:
 		bPreviewSet(1, false);
-		cap.getDeviceInfo((camId - 1), deviceName, vid, pid, devicePath);
-		if ((vid == "2560") && (pid == "c140"))
+		cap.getDeviceInfo((camId - 1), deviceName, vid, pid, devicePath); 
+		if ((vid == "2560") && (pid == "c1d8" || pid == "c1d7" || pid == "c0d7")) // condition added for CU135 devices
+		{
+			_CU40 = false;
+			_CU51 = false;
+			_12CUNIR = false;
+			_10CUG_C = false;
+			_CU55M = false;
+			_20CUG = false;
+			_CU135 = true;
+		}
+		else if ((vid == "2560") && (pid == "c140"))
 		{
 			_CU40 = true;
 			_CU51 = false;
@@ -597,6 +645,7 @@ bool listDevices()
 			_10CUG_C = false;
 			_CU55M = false;
 			_20CUG = false;
+			_CU135 = false;
 		}
 		else if ((vid == "2560") && (pid == "c152"))
 		{
@@ -606,6 +655,7 @@ bool listDevices()
 			_10CUG_C = false;
 			_CU55M = false;
 			_20CUG = false;
+			_CU135 = false;
 		}
 		else if ((vid == "2560") && (pid == "c113"))
 		{
@@ -615,6 +665,7 @@ bool listDevices()
 			_10CUG_C = false;
 			_CU55M = false;
 			_20CUG = false;
+			_CU135 = false;
 		}
 		else if ((vid == "2560") && (pid == "c111"))
 		{
@@ -624,6 +675,7 @@ bool listDevices()
 			_10CUG_C = true;
 			_CU55M = false;
 			_20CUG = false;
+			_CU135 = false;
 		}
 		else if ((vid == "2560") && (pid == "c155"))
 		{
@@ -633,6 +685,7 @@ bool listDevices()
 			_10CUG_C = false;
 			_CU55M = true;
 			_20CUG = false;
+			_CU135 = false;
 		}
 		else if ((vid == "2560") && (pid == "c124"))
 		{
@@ -642,6 +695,7 @@ bool listDevices()
 			_10CUG_C = false;
 			_CU55M = false;
 			_20CUG = true;
+			_CU135 = false;
 		}
 		else
 		{
@@ -651,6 +705,7 @@ bool listDevices()
 			_10CUG_C = false;
 			_CU55M = false;
 			_20CUG = false;
+			_CU135 = false;
 		}
 		if (cap.isOpened())
 			cap.release();
@@ -701,9 +756,9 @@ bool listDevices()
 				return 0;
 			}
 		}
-		if ((vid == "2560") && (pid == "c140") || (pid == "c152") || (pid == "c113") || (pid == "c111") || (pid == "c155") || (pid == "c124"))
+		if ((vid == "2560") && (pid == "c140") || (pid == "c152") || (pid == "c113") || (pid == "c111") || (pid == "c155") || (pid == "c124") || (pid == "c1d8" || pid == "c1d7" || pid == "c0d7"))
 		{
-			cap.set(CV_CAP_PROP_CONVERT_RGB, false);
+			cap.set(CAP_PROP_CONVERT_RGB/*CV_CAP_PROP_CONVERT_RGB*/, false);
 		}
 
 #ifdef _WIN32
@@ -713,6 +768,7 @@ bool listDevices()
 		bOpenHID = initextensionunit(tDevicePath);
 
 #elif __linux__
+		bool isHidAvailable = false;
 
 		udev = udev_new();
 		if (!udev)
@@ -739,6 +795,7 @@ bool listDevices()
 			if (!dev)
 			{
 				printf("Unable to find parent usb device.");
+				continue;
 			}
 
 			VID = udev_device_get_sysattr_value(dev, "idVendor");
@@ -746,6 +803,7 @@ bool listDevices()
 
 			if ((vid == VID) && (pid == PID))
 			{
+				isHidAvailable = true;
 				devicePath = hidPath;
 				udev_device_unref(dev);
 				break;
@@ -759,7 +817,14 @@ bool listDevices()
 		if (hid_fd > 0)
 			closeHID();
 
-		hid_fd = ::open(devicePath.c_str(), O_RDWR | O_NONBLOCK, 0);
+		if(!dev)
+			hid_fd = -1;
+		else
+			if(isHidAvailable)
+				hid_fd = ::open(devicePath.c_str(), O_RDWR | O_NONBLOCK, 0);
+			else
+				hid_fd = -1;
+			
 		if (hid_fd < 0)
 			bOpenHID = false;
 		else
@@ -806,6 +871,7 @@ bool configFormats()
 			}
 			cout << '\t' << option << " . " << "FormatType: " << formatType << " Width: " << width << " Height: " << height << " Fps: " << fps << endl;
 			option++;
+			checkFormat = true; // included to check format while streaming after changing formats/resolution
 		}
 		while ((index < 0) || (index >= option))
 		{
@@ -820,7 +886,7 @@ bool configFormats()
 		{
 		case EXIT:
 #ifdef _WIN32
-
+			bPreviewSet(1, false);
 			if (deinitextensionunit())
 				t.detach();
 			bSwitch = true;
@@ -868,7 +934,7 @@ bool configFormats()
 
 			curWidth = width;
 			curHeight = height;
-
+			
 #ifdef _WIN32
 			if (formatType == "Y12")
 				Y12Format = true;
@@ -889,6 +955,7 @@ bool configFormats()
 				Y16Format = false;
 #endif
 			formatType = '\0';
+			checkFormat = true; // included to check format while streaming after changing formats/resolution
 			width = height = fps = 0;
 			break;
 		}
@@ -996,13 +1063,22 @@ bool configUVCSettings()
 {
 #ifdef _WIN32
 
-	int vid[PROPERTY] = { EXIT, 1, 2, CV_CAP_PROP_BRIGHTNESS, CV_CAP_PROP_CONTRAST, CV_CAP_PROP_SATURATION, CV_CAP_PROP_HUE, CV_CAP_PROP_GAIN, CV_CAP_PROP_EXPOSURE, CV_CAP_PROP_WHITE_BALANCE_BLUE_U, CV_CAP_PROP_SHARPNESS, CV_CAP_PROP_GAMMA, CV_CAP_PROP_ZOOM, CV_CAP_PROP_FOCUS, CV_CAP_PROP_BACKLIGHT, CV_CAP_PROP_PAN, CV_CAP_PROP_TILT, CV_CAP_PROP_ROLL, CV_CAP_PROP_IRIS };
-
+	//int vid[PROPERTY] = { EXIT, 1, 2, CV_CAP_PROP_BRIGHTNESS, CV_CAP_PROP_CONTRAST, CV_CAP_PROP_SATURATION, CV_CAP_PROP_HUE, CV_CAP_PROP_GAIN, CV_CAP_PROP_EXPOSURE, CV_CAP_PROP_WHITE_BALANCE_BLUE_U, CV_CAP_PROP_SHARPNESS, CV_CAP_PROP_GAMMA, CV_CAP_PROP_ZOOM, CV_CAP_PROP_FOCUS, CV_CAP_PROP_BACKLIGHT, CV_CAP_PROP_PAN, CV_CAP_PROP_TILT, CV_CAP_PROP_ROLL, CV_CAP_PROP_IRIS };
+	//changed as per Opencv 4.5.3
+	int vid[PROPERTY] = { EXIT, 1, 2,CAP_PROP_BRIGHTNESS, CAP_PROP_CONTRAST, CAP_PROP_SATURATION,
+		CAP_PROP_HUE, CAP_PROP_GAIN, CAP_PROP_EXPOSURE, CAP_PROP_WHITE_BALANCE_BLUE_U,
+		CAP_PROP_SHARPNESS,CAP_PROP_GAMMA, CAP_PROP_ZOOM, CAP_PROP_FOCUS, CAP_PROP_BACKLIGHT,
+		CAP_PROP_PAN, CAP_PROP_TILT, CAP_PROP_ROLL, CAP_PROP_IRIS };
 	string vidStr[PROPERTY] = { "Exit", "Back", "Main Menu", "Brightness", "Contrast", "Saturation", "Hue", "Gain", "Exposure", "White Balance", "Sharpness", "Gamma", "Zoom", "Focus", "Backlight", "Pan", "Tilt", "Roll", "Iris" };
 
 #elif __linux__
 
-	int vid[PROPERTY] = { EXIT, 1, 2, CV_CAP_PROP_BRIGHTNESS, CV_CAP_PROP_CONTRAST, CV_CAP_PROP_SATURATION, CV_CAP_PROP_HUE, CV_CAP_PROP_GAIN, CV_CAP_PROP_EXPOSURE, CV_CAP_PROP_WHITE_BALANCE_BLUE_U, CV_CAP_PROP_SHARPNESS, CV_CAP_PROP_GAMMA, CV_CAP_PROP_ZOOM, CV_CAP_PROP_FOCUS, CV_CAP_PROP_BACKLIGHT, CV_CAP_PROP_PAN, CV_CAP_PROP_TILT };
+	//int vid[PROPERTY] = { EXIT, 1, 2, CV_CAP_PROP_BRIGHTNESS, CV_CAP_PROP_CONTRAST, CV_CAP_PROP_SATURATION, CV_CAP_PROP_HUE, CV_CAP_PROP_GAIN, CV_CAP_PROP_EXPOSURE, CV_CAP_PROP_WHITE_BALANCE_BLUE_U, CV_CAP_PROP_SHARPNESS, CV_CAP_PROP_GAMMA, CV_CAP_PROP_ZOOM, CV_CAP_PROP_FOCUS, CV_CAP_PROP_BACKLIGHT, CV_CAP_PROP_PAN, CV_CAP_PROP_TILT };
+	//changed as per Opencv 4.5.3
+	int vid[PROPERTY] = { EXIT, 1, 2,CAP_PROP_BRIGHTNESS, CAP_PROP_CONTRAST, CAP_PROP_SATURATION,
+		CAP_PROP_HUE, CAP_PROP_GAIN, CAP_PROP_EXPOSURE, CAP_PROP_WHITE_BALANCE_BLUE_U,
+		CAP_PROP_SHARPNESS,CAP_PROP_GAMMA, CAP_PROP_ZOOM, CAP_PROP_FOCUS, CAP_PROP_BACKLIGHT,
+		CAP_PROP_PAN, CAP_PROP_TILT };
 	string vidStr[PROPERTY] = { "Exit", "Back", "Main Menu", "Brightness", "Contrast", "Saturation", "Hue", "Gain", "Exposure", "White Balance", "Sharpness", "Gamma", "Zoom", "Focus", "Backlight", "Pan", "Tilt" };
 
 #endif
@@ -1071,22 +1147,23 @@ bool configUVCSettings()
 			cout << endl << "Camera Exploration is done" << endl;
 			break;
 
-		case CV_CAP_PROP_BRIGHTNESS:
-		case CV_CAP_PROP_CONTRAST:
-		case CV_CAP_PROP_HUE:
-		case CV_CAP_PROP_SATURATION:
-		case CV_CAP_PROP_SHARPNESS:
-		case CV_CAP_PROP_GAMMA:
-		case CV_CAP_PROP_WHITE_BALANCE_BLUE_U:
-		case CV_CAP_PROP_BACKLIGHT:
-		case CV_CAP_PROP_GAIN:
-		case CV_CAP_PROP_PAN:
-		case CV_CAP_PROP_TILT:
-		case CV_CAP_PROP_ROLL:
-		case CV_CAP_PROP_ZOOM:
-		case CV_CAP_PROP_EXPOSURE:
-		case CV_CAP_PROP_IRIS:
-		case CV_CAP_PROP_FOCUS:
+		// changed Opencv 4.5.3
+		case CAP_PROP_BRIGHTNESS/*CV_CAP_PROP_BRIGHTNESS*/:
+		case CAP_PROP_CONTRAST/*CV_CAP_PROP_CONTRAST*/:
+		case CAP_PROP_HUE/*CV_CAP_PROP_HUE*/:
+		case CAP_PROP_SATURATION/*CV_CAP_PROP_SATURATION*/:
+		case CAP_PROP_SHARPNESS/*CV_CAP_PROP_SHARPNESS*/:
+		case CAP_PROP_GAMMA/*CV_CAP_PROP_GAMMA*/:
+		case CAP_PROP_WHITE_BALANCE_BLUE_U/*CV_CAP_PROP_WHITE_BALANCE_BLUE_U*/:
+		case CAP_PROP_BACKLIGHT/*CV_CAP_PROP_BACKLIGHT*/:
+		case CAP_PROP_GAIN/*CV_CAP_PROP_GAIN*/:
+		case CAP_PROP_PAN/*CV_CAP_PROP_PAN*/:
+		case CAP_PROP_TILT/*CV_CAP_PROP_TILT*/:
+		case CAP_PROP_ROLL/*CV_CAP_PROP_ROLL*/:
+		case CAP_PROP_ZOOM/*CV_CAP_PROP_ZOOM*/:
+		case CAP_PROP_EXPOSURE/*CV_CAP_PROP_EXPOSURE*/:
+		case CAP_PROP_IRIS/*CV_CAP_PROP_IRIS*/:
+		case CAP_PROP_FOCUS/*CV_CAP_PROP_FOCUS*/:
 			if (!(setVidProp(uvcProperty[choice].first, uvcProperty[choice].second)))
 			{
 				cout << endl << "Set Video Property Failed" << endl;
@@ -1110,7 +1187,7 @@ bool captureStill()
 	memset(buf, 0, 240);
 	memset(buf1, 0, 240);
 	time_t t = time(0);
-	Mat stillFrame;
+	Mat stillFrame, RsltFrame;
 
 	bool IsRAWSelected = false;
 
@@ -1143,7 +1220,7 @@ bool captureStill()
 			IsRAWSelected = true;
 
 			bPreviewSet(1, false);
-			cap.set(CV_CAP_PROP_CONVERT_RGB, false);
+			cap.set(CAP_PROP_CONVERT_RGB, false);
 
 			num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
@@ -1163,7 +1240,7 @@ bool captureStill()
 		num = sprintf_s(buf, "OpenCVCamBGR_%dx%d_%d%d%d%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 		num = sprintf_s(buf1, "OpenCVCamIR_%dx%d_%d%d%d%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 	}
-	else if ((_CU55M && Y12Format) || (_20CUG && Y16Format)) {
+	else if ((_CU55M && Y12Format) || ((_CU135 || _20CUG) && Y16Format)) {
 		num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 	}
 	else
@@ -1203,7 +1280,7 @@ bool captureStill()
 			IsRAWSelected = true;
 
 			bPreviewSet(1, false);
-			cap.set(CV_CAP_PROP_CONVERT_RGB, false);
+			cap.set(CAP_PROP_CONVERT_RGB, false);
 
 			sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
@@ -1222,7 +1299,7 @@ bool captureStill()
 		sprintf(buf, "%s/OpenCVCamBGR_%dx%d_%d%d%d_%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 		sprintf(buf1, "%s/OpenCVCamIR_%dx%d_%d%d%d%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
-	else if ((_CU55M && Y12Format) || (_20CUG && Y16Format)) {
+	else if ((_CU55M && Y12Format) || ((_CU135 || _20CUG) && Y16Format)) {
 		sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
 	else
@@ -1232,9 +1309,13 @@ bool captureStill()
 #endif
 
 CAPTURE:
-#ifdef __linux__
+
+	// commented by Rishap
+//#ifdef __linux__
+//	bReadSet(1, false);
+//#endif
+
 	bReadSet(1, false);
-#endif
 	if (cap.read(stillFrame))
 	{
 		if (!stillFrame.empty())
@@ -1242,11 +1323,14 @@ CAPTURE:
 			if (IsRAWSelected)
 			{
 				SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows * 2));
-
-				cap.set(CV_CAP_PROP_CONVERT_RGB, true);
+#ifdef __linux__
+				if((_CU135 || _20CUG) && Y16Format)
+					cap.set(CAP_PROP_CONVERT_RGB, false);
+				else
+					cap.set(CAP_PROP_CONVERT_RGB, true);
 
 				bPreviewSet(1, true);
-
+#endif
 			}
 			else
 			{
@@ -1281,22 +1365,39 @@ CAPTURE:
 					ConvertY12forStill(stillFrame, StillBuff);
 					SaveInRAW(StillBuff, buf, (stillFrame.cols * stillFrame.rows * 2));
 				}
-				else if (_20CUG && Y16Format)
+				else if ((_CU135 || _20CUG) && Y16Format)
 				{
-					SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows * 2));
+					convertScaleAbs(stillFrame, ResultImage, 0.2490234375);
+					imwrite(buf, ResultImage);
 				}
+				#ifdef _WIN32
+				else if (formatType.substr(0,4) == "YUY2" ) {
+					
+					/*cap.set(CAP_PROP_CONVERT_RGB, 1);*/
+					cvtColor(stillFrame, RsltFrame, COLOR_YUV2BGR_YUY2);
+					imwrite(buf, RsltFrame);
+				}
+				else if (formatType.substr(0, 4) == "UYVY")
+				{
+					cvtColor(stillFrame, RsltFrame, COLOR_YUV2BGR_UYVY);
+					imwrite(buf, RsltFrame);
+				}
+				#endif
 				else
 				{
 					imwrite(buf, stillFrame);
-#ifdef __linux__
-					bReadSet(1, true);
-#endif
+//commented by rishap					
+//#ifdef __linux__
+//					bReadSet(1, true);
+//#endif
 				}
+				
 			}
+			bReadSet(1, true);
 			cout << endl << '\t' << buf << " image is saved " << endl << endl;
 		}
 	}
-
+	
 	memset(buf, 0, 240);
 	memset(buf1, 0, 240);
 

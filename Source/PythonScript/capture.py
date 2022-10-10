@@ -34,12 +34,12 @@ class Capture:
                 Capture.caprure_done = False
                 Capture.capture_flag = False
                 if Capture.convert_to_RAW_Selected:
-                    if not (frame_format == "UYVY") | (frame_format == "YUY2") | (frame_format == "Y8  "):
+                    if not (frame_format == "UYVY") | (frame_format == "YUY2") | (frame_format == "Y8  ") | (frame_format == "Y16 "):
                         display.Display:stop_display()
-                        cap.set(cv2.CAP_PROP_CONVERT_RGB, True)
+                        cap.set(cv2.CAP_PROP_CONVERT_RGB, 1)
                         display.Display:resume_display()
 
-                    
+
                 if not Capture.capture_thread.is_alive():
                     Capture.capture_thread = threading.Thread(target=Capture.convert_image, args=(frame, frame_format,),
                                                               daemon=True)
@@ -58,16 +58,16 @@ class Capture:
         :param frame: The frame which needs to be converted
         :param frame_format: The format of the frame. for ex: YUYV, MJPG, etc
         '''
-        
+
         if frame_format == "Y8  ":
            image = frame.data
            Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
-            
-        
+
+
         elif Capture.convert_to_RAW_Selected:
             Capture.convert_to_RAW_Selected = False
             image = frame
-                
+
             Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
 
         elif frame_format == Conversion.V4L2_PIX_FMT_Y16:
@@ -111,7 +111,7 @@ class Capture:
             frame_format = frame_format[:-1]  # slicing the string to remove space("Y16 ") in y12 and y16.
 
         file_name = f"{os.getcwd()}/OpenCVCam_{ir}image_{frame_format}_{height}x{width}_{time}{image_format}"
-            
+
         if image_format == '.raw':  # since raw file write is not supported by imwrite, we are using file write
             try:
                 fp = open(file_name, 'wb+')

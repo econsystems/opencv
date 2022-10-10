@@ -39,11 +39,11 @@ class Format:
         '''
 
         format_type = self.decode_fourcc(self.cap.get(cv2.CAP_PROP_FOURCC))
-        if ((format_type == "Y8  ") | (format_type == "UYVY") | (format_type == "Y16 ") | (format_type == "YUY2") | (format_type == "YUYV") | (format_type == "Y12 ")):
+        if ((format_type == "Y8  ") | (format_type == "UYVY") | (format_type == "Y16 ") | (format_type == "YUY2") | (format_type == "YUYV") ):
             return True
         else:
             return False
-    
+
     def get_current_format(self):
         '''
         Method Name: get_current_format
@@ -86,13 +86,13 @@ class Format:
             if not self.cap.setFormatType(choice - 2):
                 return False
             format_type, width, height, fps = self.get_current_format()
-            if ((format_type == "UYVY") | (format_type == "YUY2")):
-                if not self.cap.set(cv2.CAP_PROP_CONVERT_RGB, False):
+            if ((format_type == "UYVY") | (format_type == "YUY2") | (format_type == "Y12") | (format_type == "Y16 ")):
+                if not self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 0):
                     print("Failed to set CAP_PROP_CONVERT_RGB to False")
                 else:
                     sleep(0.5)
             else:
-                self.cap.set(cv2.CAP_PROP_CONVERT_RGB, True)
+                self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 1)
             print(f"\tCurrent Format={format_type},Width={width},Height={height},FPS={fps}")
             self.display1.start_display(self.cap, self.get_current_format(),self.device_name)
             return True

@@ -99,6 +99,13 @@
 	* See3CAM_CU55M
 	* See3CAM_20CUG
 	* See3CAM_CU22
+	* See3CAM_CU27
+	* See3CAM_160
+	* See3CAM_CU81
+	* e-cam82USB
+	* See3CAM_CU135M_H03R1
+	* See3CAM_CU135M_H01R1
+	* See3CAM_CU135M
 
 ## Releases
 
@@ -107,11 +114,11 @@
 
 ## What's new
 
-* Added Support for Python.
-* Implemented the Y8GrabberFilter for Y8 Formats.
+* Added Support for OpenCV 4.5.5
 
 ## Release
 
+* OpenCV v1.0.4		-	03-Aug-22
 * OpenCV v1.0.3		-	15-Aug-20
 * OpenCV v1.0.2		-	03-Jun-20
 * OpenCV v1.0.1		-	17-Dec-19

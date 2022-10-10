@@ -5,6 +5,8 @@
 #include "cap_mfx_reader.hpp"
 #include "opencv2/core/base.hpp"
 #include "cap_mfx_common.hpp"
+#include "opencv2/imgproc/hal/hal.hpp"
+#include "cap_interface.hpp"
 
 using namespace cv;
 using namespace std;
@@ -39,7 +41,7 @@ VideoCapture_IntelMFX::VideoCapture_IntelMFX(const cv::String &filename)
 
     // Init device and session
     deviceHandler = createDeviceHandler();
-    session = new MFXVideoSession();
+    session = new MFXVideoSession_WRAP();
     if (!deviceHandler->init(*session))
     {
         MSG(cerr << "MFX: Can't initialize session" << endl);
@@ -85,11 +87,11 @@ VideoCapture_IntelMFX::VideoCapture_IntelMFX(const cv::String &filename)
         return;
     }
 
-    // Adjust parameters
+    // Adjust parameters - COMMENTED: h265 decoder resets crop size to 0 (oneVPL/Win)
 
-    res = decoder->Query(&params, &params);
-    DBG(cout << "MFX Query: " << res << endl << params.mfx << params.mfx.FrameInfo);
-    CV_Assert(res >= MFX_ERR_NONE);
+    //res = decoder->Query(&params, &params);
+    //DBG(cout << "MFX Query: " << res << endl << params.mfx << params.mfx.FrameInfo);
+    //CV_Assert(res >= MFX_ERR_NONE);
 
     // Init surface pool
 
@@ -103,13 +105,18 @@ VideoCapture_IntelMFX::VideoCapture_IntelMFX(const cv::String &filename)
     // Init decoder
 
     res = decoder->Init(&params);
-    DBG(cout << "MFX Init: " << res << endl << params.mfx.FrameInfo);
+    DBG(cout << "MFX decoder Init: " << res << endl << params.mfx.FrameInfo);
     if (res < MFX_ERR_NONE)
     {
         MSG(cerr << "MFX: Failed to init decoder: " << res << endl);
         return;
     }
 
+    frameSize = Size(params.mfx.FrameInfo.CropW, params.mfx.FrameInfo.CropH);
+    if (frameSize == Size(0, 0)) // sometimes Crop size is 0
+    {
+        frameSize = Size(params.mfx.FrameInfo.Width, params.mfx.FrameInfo.Height);
+    }
     good = true;
 }
 
@@ -125,13 +132,26 @@ VideoCapture_IntelMFX::~VideoCapture_IntelMFX()
     cleanup(deviceHandler);
 }
 
-double VideoCapture_IntelMFX::getProperty(int) const
+double VideoCapture_IntelMFX::getProperty(int prop) const
 {
-    MSG(cerr << "MFX: getProperty() is not implemented" << endl);
-    return 0;
+    if (!good)
+    {
+        MSG(cerr << "MFX: can not call getProperty(), backend has not been initialized" << endl);
+        return 0;
+    }
+    switch (prop)
+    {
+        case CAP_PROP_FRAME_WIDTH:
+            return frameSize.width;
+        case CAP_PROP_FRAME_HEIGHT:
+            return frameSize.height;
+        default:
+            MSG(cerr << "MFX: unsupported property" << endl);
+            return 0;
+    }
 }
 
-bool VideoCapture_IntelMFX::setProperty(int, double)
+bool VideoCapture_IntelMFX::setProperty(int, int)
 {
     MSG(cerr << "MFX: setProperty() is not implemented" << endl);
     return false;
@@ -213,7 +233,7 @@ bool VideoCapture_IntelMFX::grabFrame()
         else if (res == MFX_WRN_DEVICE_BUSY)
         {
             DBG(cout << "Waiting for device" << endl);
-            sleep(1);
+            sleep_ms(1000);
             continue;
         }
         else if (res == MFX_WRN_VIDEO_PARAM_CHANGED)
@@ -243,17 +263,11 @@ bool VideoCapture_IntelMFX::retrieveFrame(int, OutputArray out)
 
     const int cols = info.CropW;
     const int rows = info.CropH;
-    Mat nv12(rows * 3 / 2, cols, CV_8UC1);
 
-    Mat Y(rows, cols, CV_8UC1, data.Y, data.Pitch);
-    Mat UV(rows / 2, cols, CV_8UC1, data.UV, data.Pitch);
+    out.create(rows, cols, CV_8UC3);
+    Mat res = out.getMat();
 
-    Y.copyTo(Mat(nv12, Rect(0, 0, cols, rows)));
-    UV.copyTo(Mat(nv12, Rect(0, rows, cols, rows / 2)));
-
-    Mat u_and_v[2];
-    split(UV.reshape(2), u_and_v);
-    cvtColor(nv12, out, COLOR_YUV2BGR_NV12);
+    hal::cvtTwoPlaneYUVtoBGR(data.Y, data.UV, data.Pitch, res.data, res.step, cols, rows, 3, false, 0);
 
     return true;
 }
@@ -269,3 +283,8 @@ int VideoCapture_IntelMFX::getCaptureDomain()
 }
 
 //==================================================================================================
+
+cv::Ptr<IVideoCapture> cv::create_MFX_capture(const std::string &filename)
+{
+    return cv::makePtr<VideoCapture_IntelMFX>(filename);
+}

@@ -6,7 +6,6 @@
 
 // Linux specific
 #ifdef __linux__
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -15,17 +14,66 @@
 using namespace std;
 using namespace cv;
 
-bool DeviceHandler::init(MFXVideoSession &session)
+#ifndef HAVE_ONEVPL
+static mfxIMPL getImpl()
+{
+    static const size_t res = utils::getConfigurationParameterSizeT("OPENCV_VIDEOIO_MFX_IMPL", MFX_IMPL_AUTO_ANY);
+    return (mfxIMPL)res;
+}
+#endif
+
+static size_t getExtraSurfaceNum()
+{
+    static const size_t res = cv::utils::getConfigurationParameterSizeT("OPENCV_VIDEOIO_MFX_EXTRA_SURFACE_NUM", 1);
+    return res;
+}
+
+static size_t getPoolTimeoutSec()
+{
+    static const size_t res = utils::getConfigurationParameterSizeT("OPENCV_VIDEOIO_MFX_POOL_TIMEOUT", 1);
+    return res;
+}
+
+#ifdef HAVE_ONEVPL
+// oneVPL loader singleton (HW implementation only)
+static mfxLoader setupVPLLoader()
+{
+    mfxLoader instance = MFXLoad();
+    mfxConfig cfg = MFXCreateConfig(instance);
+    mfxVariant impl;
+    impl.Type = MFX_VARIANT_TYPE_U32;
+    impl.Data.U32 = MFX_IMPL_TYPE_HARDWARE;
+    MFXSetConfigFilterProperty(cfg, (const mfxU8*)"mfxImplDescription.Impl", impl);
+    DBG(cerr << "MFX Load: " << instance << endl);
+    return instance;
+}
+
+mfxLoader getVPLLoaderInstance()
+{
+    static mfxLoader instance = setupVPLLoader();
+    return instance;
+}
+#endif
+
+//==================================================================================================
+
+bool DeviceHandler::init(MFXVideoSession_WRAP &session)
 {
     mfxStatus res = MFX_ERR_NONE;
-    mfxIMPL impl = MFX_IMPL_AUTO;
     mfxVersion ver = { {19, 1} };
+
+#ifdef HAVE_ONEVPL
+    res = session.CreateSession();
+    DBG(cout << "MFX CreateSession: " << res << endl);
+#else
+    mfxIMPL impl = getImpl();
 
     res = session.Init(impl, &ver);
     DBG(cout << "MFX SessionInit: " << res << endl);
 
     res = session.QueryIMPL(&impl);
     DBG(cout << "MFX QueryIMPL: " << res << " => " << asHex(impl) << endl);
+#endif
 
     res = session.QueryVersion(&ver);
     DBG(cout << "MFX QueryVersion: " << res << " => " << ver.Major << "." << ver.Minor << endl);
@@ -42,7 +90,7 @@ bool DeviceHandler::init(MFXVideoSession &session)
 
 VAHandle::VAHandle() {
     // TODO: provide a way of modifying this path
-    const string filename = "/dev/dri/card0";
+    const string filename = "/dev/dri/renderD128";
     file = open(filename.c_str(), O_RDWR);
     if (file < 0)
         CV_Error(Error::StsError, "Can't open file: " + filename);
@@ -58,7 +106,7 @@ VAHandle::~VAHandle() {
     }
 }
 
-bool VAHandle::initDeviceSession(MFXVideoSession &session) {
+bool VAHandle::initDeviceSession(MFXVideoSession_WRAP &session) {
     int majorVer = 0, minorVer = 0;
     VAStatus va_res = vaInitialize(display, &majorVer, &minorVer);
     DBG(cout << "vaInitialize: " << va_res << endl << majorVer << '.' << minorVer << endl);
@@ -97,7 +145,7 @@ SurfacePool::SurfacePool(ushort width_, ushort height_, ushort count, const mfxF
     for(int i = 0; i < count; ++i)
     {
         mfxFrameSurface1 &surface = surfaces[i];
-        uint8_t * dataPtr = buffers + oneSize * i;
+        uint8_t * dataPtr = buffers.data() + oneSize * i;
         memset(&surface, 0, sizeof(mfxFrameSurface1));
         surface.Info = frameInfo;
         surface.Data.Y = dataPtr;
@@ -115,11 +163,26 @@ SurfacePool::~SurfacePool()
 {
 }
 
+SurfacePool * SurfacePool::_create(const mfxFrameAllocRequest &request, const mfxVideoParam &params)
+{
+    return new SurfacePool(request.Info.Width,
+                           request.Info.Height,
+                           saturate_cast<ushort>((size_t)request.NumFrameSuggested + getExtraSurfaceNum()),
+                           params.mfx.FrameInfo);
+}
+
 mfxFrameSurface1 *SurfacePool::getFreeSurface()
 {
-    for(std::vector<mfxFrameSurface1>::iterator i = surfaces.begin(); i != surfaces.end(); ++i)
-        if (!i->Data.Locked)
-            return &(*i);
+    const int64 start = cv::getTickCount();
+    do
+    {
+        for(std::vector<mfxFrameSurface1>::iterator i = surfaces.begin(); i != surfaces.end(); ++i)
+            if (!i->Data.Locked)
+                return &(*i);
+        sleep_ms(10);
+    }
+    while((cv::getTickCount() - start) / cv::getTickFrequency() < getPoolTimeoutSec()); // seconds
+    DBG(cout << "No free surface!" << std::endl);
     return 0;
 }
 
@@ -197,5 +260,3 @@ bool WriteBitstream::isOpened() const
 {
     return output.is_open();
 }
-
-//==================================================================================================

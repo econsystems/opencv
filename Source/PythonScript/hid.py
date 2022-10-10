@@ -30,6 +30,7 @@ class HIDControl:
         if sys.platform == "win32":
             self.eCAM_dll = ctypes.cdll.LoadLibrary("eCAMFwSw.dll")  # for windows, eCAMFwSW dll is loaded.
 
+
     def init_hid(self, vid, pid, device_path):
         '''
         Method Name: This method init the hid handle
@@ -43,6 +44,7 @@ class HIDControl:
         :rtype: bool
         '''
 
+
         if sys.platform == "linux":
             if self.get_hid_device_path(vid, pid):
                 self.hid_handle = self.open_hid_handle()
@@ -51,6 +53,7 @@ class HIDControl:
         elif sys.platform == "win32":
             if not self.eCAM_dll:
                 return False
+
             return self.eCAM_dll.InitExtensionUnit(device_path)
 
     def open_hid_handle(self):

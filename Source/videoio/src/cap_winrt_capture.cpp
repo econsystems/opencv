@@ -180,7 +180,7 @@ namespace cv {
     }
 
 
-    bool VideoCapture_WinRT::setProperty(int property_id, double value)
+    bool VideoCapture_WinRT::setProperty(int property_id, int value)
     {
         switch (property_id)
         {
@@ -195,6 +195,12 @@ namespace cv {
         }
         return true;
     }
+
+Ptr<IVideoCapture> create_WRT_capture(int device)
+{
+    return makePtr<VideoCapture_WinRT>(device);
+}
+
 }
 
 // end
