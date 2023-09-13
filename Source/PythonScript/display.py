@@ -31,6 +31,7 @@ class Display:
 
         Display.stop_thread = False
         Display.kill_thread = False
+
         Conversion.init_conversion(current_format, device_name)
         Display.resize_frame(current_format)
         if not Display.display_thread.is_alive():
@@ -39,39 +40,95 @@ class Display:
 
     @classmethod
     def display_frame(cls, cap):
+        # print("\n GetFrame.....")
         '''
         Method Name: display_frame
         Description: This method is a seperate thread which reads the frame from the device and displays it.
         :param cap: object of VideoCapture class in cv2 module
         '''
-
         while True:
             while not Display.stop_thread:
                 ret, frame = cap.read()
                 if not (np.sum(frame) == None):
                     if Capture.capture_flag:
-                        ret, Stillframe = cap.read()
-                        if not (np.sum(Stillframe) == None):
-                            Capture.capture_image(Stillframe, cls.frame_format, cap)
-                            continue
-
+                        Stillframe = frame
+                        Capture.capture_image(Stillframe, cls.frame_format, cap)
                     if cls.frame_format == Conversion.V4L2_PIX_FMT_Y12 or cls.frame_format == Conversion.V4L2_PIX_FMT_Y16:
                         if Conversion.y16CameraFlag == Conversion.SEE3CAM_CU40:
                             new_frame, IR_frame = Conversion.convert_frame(frame, cls.frame_format)
-                            cv2.namedWindow('IR Frame', cv2.WINDOW_NORMAL)
-                            cv2.resizeWindow('IR Frame', cls.frame_width, cls.frame_height)
-                            cv2.imshow('IR Frame', IR_frame)
+                            cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
+                            cv2.resizeWindow('Frame', cls.frame_width, cls.frame_height)
+                            cv2.imshow('Frame', IR_frame)
+
+                        elif Conversion.y16CameraFlag == Conversion.SEE3CAM_CU83:
+                            rows,cols = frame.shape
+                            if rows == 2160 and cols == 4440:
+                                    RGBframe , IRframe = Conversion.SeparatingRGBIRBuffers(frame , cls.frame_format)
+                                    if not (np.sum(RGBframe)== None):
+                                        new_frame = cv2.cvtColor(RGBframe, cv2.COLOR_YUV2BGR_UYVY)
+                                        cv2.namedWindow('RGB Frame', cv2.WINDOW_NORMAL)
+                                        cv2.resizeWindow('RGB Frame', 3840, 2160)       
+                                        cv2.imshow('RGB Frame', new_frame)
+
+                                    if not (np.sum(IRframe)== None):
+                                        cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
+                                        cv2.resizeWindow('Frame', 1920, 1080)       
+                                        cv2.imshow('Frame', IRframe)
+
+                            elif rows == 1350 and cols == 3840:
+
+                                IRframe = Conversion.ConvertRaw10toRaw8(frame,cls.frame_format)
+                                cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
+                                cv2.resizeWindow('Frame', 3840, 2160)
+                                cv2.imshow('Frame', IRframe)
+                            
+                            elif rows == 675 and cols == 1920:
+
+                                IRframe = Conversion.ConvertRaw10toRaw8(frame,cls.frame_format)
+                                cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
+                                cv2.resizeWindow('Frame', 1920, 1080)
+                                cv2.imshow('Frame', IRframe)
                         else:
                             new_frame = Conversion.convert_frame(frame, cls.frame_format)
                     elif cls.frame_format == "UYVY" or cls.frame_format == "YUY2":
-                        new_frame = Conversion.convert_frame(frame, cls.frame_format)
+
+                        if Conversion.y16CameraFlag == Conversion.SEE3CAM_CU83:
+                            # print("Inside UYVY")
+                            if not (np.sum(frame) == None):
+                                new_frame = Conversion.convert_frame(frame, cls.frame_format)
+                                cv2.namedWindow('RGB Frame', cv2.WINDOW_NORMAL)
+                                cv2.resizeWindow('RGB Frame', cls.frame_width, cls.frame_height)       
+                                cv2.imshow('RGB Frame', new_frame)
+
+                        elif Conversion.IRRGBCameraFlag27CUG == Conversion.SEE3CAM_27CUG:
+                            RGB_frame = Conversion.Check_RGB_Frame(frame)
+                            if not (np.sum(RGB_frame) == None):
+                                new_frame = Conversion.convert_frame(RGB_frame, cls.frame_format)
+                                cv2.namedWindow('RGB Frame', cv2.WINDOW_NORMAL)
+                                cv2.resizeWindow('RGB Frame', cls.frame_width, cls.frame_height)       
+                                cv2.imshow('RGB Frame', new_frame)
+                                continue
+                            if not (np.sum(frame) == None):                                  
+                                IRFrame = Conversion.convert_frame(frame, cls.frame_format)
+                                cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
+                                cv2.resizeWindow('Frame', cls.frame_width, cls.frame_height)          
+                                cv2.imshow('Frame', IRFrame)
+                            else:
+                                new_frame = Conversion.convert_frame(frame, cls.frame_format)
+                                cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
+                                cv2.resizeWindow('Frame', cls.frame_width, cls.frame_height)
+                                cv2.imshow('Frame', new_frame)
+                        else:
+                            new_frame = Conversion.convert_frame(frame, cls.frame_format)
+                            cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
+                            cv2.resizeWindow('Frame', cls.frame_width, cls.frame_height)
+                            cv2.imshow('Frame', new_frame)
                     else:
                         new_frame = frame
-                        
-                    cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
-                    cv2.resizeWindow('Frame', cls.frame_width, cls.frame_height)
-                                       
-                    cv2.imshow('Frame', new_frame)
+                        cv2.namedWindow('Frame', cv2.WINDOW_NORMAL)
+                        cv2.resizeWindow('Frame', cls.frame_width, cls.frame_height)
+                        cv2.imshow('Frame', new_frame)
+                            
                     cv2.waitKey(1)
                 else:
                     print("Null Frame Received...")
@@ -80,6 +137,8 @@ class Display:
                 cv2.destroyAllWindows()
                 break
             if sys.platform == "linux":
+                break
+            if sys.platform == "win32":
                 break
 
     @staticmethod
@@ -95,16 +154,23 @@ class Display:
                 sleep(0.3)
                 if sys.platform == "linux":
                     Display.display_thread.join()
+                elif sys.platform == "win32":
+                    Display.display_thread.join()
+
+
         if sys.platform == "linux":
             cv2.destroyAllWindows()
+        if sys.platform == "win32":
+            cv2.destroyAllWindows()
+
+
     @staticmethod
     def resume_display():
         '''
         Method Name: resume_display
         Description: This method resume the display thread and closes all windows.
         '''
-
-        if Display.stop_thread:
+        if Display.stop_thread:              
                 Display.stop_thread = False
 
     @classmethod

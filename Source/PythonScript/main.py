@@ -84,6 +84,7 @@ class MainClass:
             5: self.hid_control_menu,
         }
         while True:
+            # print(Capture.StillCapturingImage)
             if not Capture.StillCapturingImage:
                 choice = -1
                 print("\n\t0.EXIT\n\t1.BACK \n\t2.UVC CONTROLS\n\t3.FORMAT SETTINGS\n\t4.CAPTURE STILL IMAGE")
@@ -124,7 +125,6 @@ class MainClass:
         description: This method enables the flag which is used to capture image.
         :return: True.
         '''
-        Capture.StillCapturingImage = True
         if self.format.IsRawSaveSupport():
             print("\n\t1.BACK\n\t2.RAW FORMAT\n\t3.RGB FORMAT")
             choice = get_integer("Enter Your Option:", 1, 3)
@@ -134,16 +134,18 @@ class MainClass:
                 return True
             if choice == 2:
                 print("\tSaving Raw image to the current working directory...")
-                if sys.platform == "win32":
-                    self.display2.stop_display()
+                # if sys.platform == "win32":
+                #     self.display2.stop_display()
                 self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
                 Capture.capture_flag = True
                 Capture.convert_to_RAW_Selected = True
+                Capture.StillCapturingImage = True
                 if sys.platform == "win32":
                     self.display2.resume_display()
             if choice == 3:
                 print("\tSaving image to the current working directory...")
                 Capture.capture_flag = True
+                Capture.StillCapturingImage = True
                 Capture.convert_to_RGB_Selected = True
         else:
             print("\tSaving image to the current working directory...")

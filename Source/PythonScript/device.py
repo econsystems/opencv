@@ -20,6 +20,8 @@ class Device:
             cap.release()
             cv2.destroyAllWindows()
         ret, device_count = cap.getDevices()
+        print("device_count",device_count)
+        print("ret",ret)
         if not ret:
             print("cap.getDevices Failed")
             return None
@@ -32,6 +34,7 @@ class Device:
                 return None
             print(f"\t{i + 1}.{device_name}")
         choice = get_integer("Enter 0 for Exit/Select Any device:", 0, device_count)
+        print("\tchoice",choice)
         if choice == 0:
             return None
         ret, device_name, vid, pid, device_path = cap.getDeviceInfo(choice - 1)
