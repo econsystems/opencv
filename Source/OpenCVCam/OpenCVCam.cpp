@@ -733,7 +733,7 @@ void *preview(void *arg)
 						gettimeofday(&tv, NULL);
                         timersub(&tv, &m_tv, &res_time);
                         cout<< "Time taken (in ms) by PrepareCU83Buffer() :" << ((int)((res_time.tv_sec*1000)+(res_time.tv_usec/1000)));
-						
+
 						cout<<"\n inside_2";
 						if (!RGBImageCU83.empty())
 						{
