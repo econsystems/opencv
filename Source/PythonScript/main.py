@@ -14,7 +14,7 @@ import cv2
 
 def intro():
     print(" E-con's OpenCV Python Application ".center(100, "*"))
-    print('OpenCV Python App Version = 1.0.4'.center(100, " "))
+    print('OpenCV Python App Version = 1.0.5'.center(100, " "))
     if sys.platform == "linux":
         print("Running in Linux Platform")
     elif sys.platform == "win32":

@@ -255,7 +255,6 @@ bool VideoCapture::open(int cameraNum, int apiPreference, const std::vector<int>
             CV_CAPTURE_LOG_DEBUG(NULL,
                                  cv::format("VIDEOIO(%s): trying capture cameraNum=%d ...",
                                             info.name, cameraNum));
-
             CV_Assert(!info.backendFactory.empty());
             const Ptr<IBackend> backend = info.backendFactory->getBackend();
             if (!backend.empty())
@@ -268,7 +267,6 @@ bool VideoCapture::open(int cameraNum, int apiPreference, const std::vector<int>
                         CV_CAPTURE_LOG_DEBUG(NULL,
                                              cv::format("VIDEOIO(%s): created, isOpened=%d",
                                                         info.name, icap->isOpened()));
-
                         if (icap->isOpened())
                         {
                             return true;
@@ -544,13 +542,14 @@ bool VideoCapture::setFormatType(int index)
                   if (icap->setProperty(CV_CAP_PROP_FRAME_HEIGHT, height))
                   {
                       icap->setProperty(CV_CAP_PROP_FPS, fps);
+                      return true;
                   }
               }
           }
       }
 
   }
-  return true;
+  return false;
 #endif
 #if defined HAVE_LIBV4L || defined HAVE_CAMV4L || defined HAVE_CAMV4L2 || defined HAVE_VIDEOIO
     // CV_TRACE_FUNCTION();
@@ -587,7 +586,6 @@ bool VideoCapture::set(int propId, int value, int mode)
 
 bool VideoCapture::grab()
 {
-
     CV_INSTRUMENT_REGION();
     bool ret = !icap.empty() ? icap->grabFrame() : false;
     if (!ret && throwOnFail)

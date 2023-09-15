@@ -50,7 +50,7 @@ using namespace cv;
 #define AUTOANDMANUAL			3
 #define	READFIRMWAREVERSION		0X40
 #define BUFFERLENGTH			65
-#define SDK_VERSION			"1.0.4"
+#define SDK_VERSION			"1.0.5"
 
 #ifdef _WIN32
 

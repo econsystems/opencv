@@ -194,9 +194,7 @@ protected:
             VideoBackendInfo& info = enabledBackends[i];
             info.priority = 1000 - i * 10;
         }
-        CV_LOG_DEBUG(NULL, "VIDEOIO: Builtin backends(" << N << "): " << dumpBackends());
-
-        if (readPrioritySettings())
+        CV_LOG_DEBUG(NULL, "VIDEOIO: Builtin backends(" << N << "): " << dumpBackends());        if (readPrioritySettings())
         {
             CV_LOG_INFO(NULL, "VIDEOIO: Updated backends priorities: " << dumpBackends());
         }

@@ -270,6 +270,13 @@ typedef uint32_t __u32;
 #define V4L2_PIX_FMT_Y12 v4l2_fourcc('Y', '1', '2', ' ')
 #endif
 
+#ifndef V4L2_PIX_FMT_ABGR32
+#define V4L2_PIX_FMT_ABGR32  v4l2_fourcc('A', 'R', '2', '4')
+#endif
+#ifndef V4L2_PIX_FMT_XBGR32
+#define V4L2_PIX_FMT_XBGR32  v4l2_fourcc('X', 'R', '2', '4')
+#endif
+
 /* Defaults - If your board can do better, set it here.  Set for the most common type inputs. */
 #define DEFAULT_V4L_WIDTH  640
 #define DEFAULT_V4L_HEIGHT 480
@@ -280,10 +287,10 @@ typedef uint32_t __u32;
 // default and maximum number of V4L buffers, not including last, 'special' buffer
 #define MAX_V4L_BUFFERS 10
 #define DEFAULT_V4L_BUFFERS 4
-#define MAX_DEVICE_DRIVER_NAME 80
+#define MAX_DEVICE_DRIVER_NAME 80 
 
 // if enabled, then bad JPEG warnings become errors and cause NULL returned instead of image
-// #define V4L_ABORT_BADJPEG
+//#define V4L_ABORT_BADJPEG
 
 namespace cv {
 
@@ -578,6 +585,8 @@ bool CvCaptureCAM_V4L::autosetup_capture_mode_v4l2()
             V4L2_PIX_FMT_NV21,
             V4L2_PIX_FMT_SBGGR8,
             V4L2_PIX_FMT_SGBRG8,
+            V4L2_PIX_FMT_XBGR32,
+            V4L2_PIX_FMT_ABGR32,
             V4L2_PIX_FMT_SN9C10X,
 #ifdef HAVE_JPEG
             V4L2_PIX_FMT_MJPEG,
@@ -647,6 +656,8 @@ bool CvCaptureCAM_V4L::convertableToRgb() const
     case V4L2_PIX_FMT_Y10:
     case V4L2_PIX_FMT_GREY:
     case V4L2_PIX_FMT_BGR24:
+    case V4L2_PIX_FMT_XBGR32:
+    case V4L2_PIX_FMT_ABGR32:
         return true;
     default:
         break;
@@ -666,6 +677,8 @@ void CvCaptureCAM_V4L::v4l2_create_frame()
         switch (palette) {
         case V4L2_PIX_FMT_BGR24:
         case V4L2_PIX_FMT_RGB24:
+        case V4L2_PIX_FMT_XBGR32:
+        case V4L2_PIX_FMT_ABGR32:
             break;
         case V4L2_PIX_FMT_YUYV:
         case V4L2_PIX_FMT_UYVY:
@@ -876,7 +889,7 @@ bool CvCaptureCAM_V4L::v4l2_reset()
 static bool checkForValidNode(String device_node_name)
 {
     int cam_fd;
-    struct v4l2_capability 		cam_cap;
+    struct v4l2_capability cam_cap;
     if ((cam_fd = open(device_node_name.c_str(), O_RDWR|O_NONBLOCK, 0)) < 0) {
       perror("Can't open camera device ");
       return false;
@@ -1941,7 +1954,7 @@ void CvCaptureCAM_V4L::convertToRgb(const Buffer &currentBuffer)
     case V4L2_PIX_FMT_JPEG:
         CV_LOG_DEBUG(NULL, "VIDEOIO(V4L2:" << deviceName << "): decoding JPEG frame: size=" << currentBuffer.buffer.bytesused);
         if(currentBuffer.buffer.bytesused > 0)
-          cv::imdecode(Mat(1, currentBuffer.buffer.bytesused, CV_8U, currentBuffer.start), IMREAD_COLOR, &destination);
+        cv::imdecode(Mat(1, currentBuffer.buffer.bytesused, CV_8U, currentBuffer.start), IMREAD_COLOR, &destination);
         return;
 #endif
     case V4L2_PIX_FMT_YUYV:
@@ -1980,6 +1993,10 @@ void CvCaptureCAM_V4L::convertToRgb(const Buffer &currentBuffer)
     case V4L2_PIX_FMT_H264:
         memcpy((char *)frame.imageData, (char *)currentBuffer.start,
                (int)currentBuffer.buffer.bytesused);
+        break;
+    case V4L2_PIX_FMT_XBGR32:
+    case V4L2_PIX_FMT_ABGR32:
+        cv::cvtColor(cv::Mat(imageSize, CV_8UC4, currentBuffer.start), destination, COLOR_BGRA2BGR);
         break;
     case V4L2_PIX_FMT_BGR24:
     default:
@@ -2111,7 +2128,7 @@ static inline int capPropertyToV4L2(int prop)
     case cv::CAP_PROP_CONVERT_RGB:
         return -1;
     case cv::CAP_PROP_WHITE_BALANCE_BLUE_U:
-        return V4L2_CID_WHITE_BALANCE_TEMPERATURE;
+       return V4L2_CID_WHITE_BALANCE_TEMPERATURE;
     case cv::CAP_PROP_RECTIFICATION:
         return -1;
     case cv::CAP_PROP_MONOCHROME:
@@ -2257,7 +2274,7 @@ bool CvCaptureCAM_V4L::icvControl(__u32 v4l2id, int &value, bool isSet) const
     if (!isSet)
     {
         value = control.value;
-      }
+    }    
     return true;
 }
 
@@ -2838,7 +2855,6 @@ IplImage *CvCaptureCAM_V4L::retrieveFrame(int)
 Ptr<IVideoCapture> create_V4L_capture_cam(int index)
 {
     cv::CvCaptureCAM_V4L* capture = new cv::CvCaptureCAM_V4L();
-
     if(index==-1)
     	return makePtr<LegacyCapture>(capture);
 
