@@ -275,7 +275,7 @@ bool CvCapture_Images::setProperty(int id, int value)
             CV_WARN("seeking to negative positions does not work - clamping");
             value = 0;
         }
-        currentframe = (int)((length - 1) * value);
+        currentframe = int((length - 1) * value);
         if (currentframe != 0)
             grabbedInOpen = false; // grabbed frame is not valid anymore
         return true;

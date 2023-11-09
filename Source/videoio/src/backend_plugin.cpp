@@ -503,7 +503,6 @@ public:
             CV_LOG_ERROR(NULL, "Video I/O: Can't release capture by plugin '" << plugin_api_->api_header.api_description << "'");
         capture_ = NULL;
     }
-
     double getProperty(int prop) const CV_OVERRIDE
     {
         double val = -1;
@@ -526,7 +525,6 @@ public:
                 return true;
         return false;
     }
-
     static CvResult CV_API_CALL retrieve_callback(int stream_idx, const unsigned char* data, int step, int width, int height, int type, void* userdata)
     {
         CV_UNUSED(stream_idx);
@@ -536,8 +534,6 @@ public:
         cv::Mat(cv::Size(width, height), type, (void*)data, step).copyTo(*dst);
         return CV_ERROR_OK;
     }
-
-
     bool retrieveFrame(int idx, cv::OutputArray img) CV_OVERRIDE
     {
         bool res = false;
@@ -546,14 +542,10 @@ public:
                 res = true;
         return res;
     }
-
-
     bool isOpened() const CV_OVERRIDE
     {
         return capture_ != NULL;  // TODO always true
     }
-
-
     int getCaptureDomain() CV_OVERRIDE
     {
         return plugin_api_->v0.id;
@@ -716,9 +708,7 @@ Ptr<IVideoCapture> PluginBackend::createCapture(int camera, const VideoCapturePa
     try
     {
         if (capture_api_)
-        {
             return PluginCapture::create(capture_api_, std::string(), camera, params); //.staticCast<IVideoCapture>();
-        }
         if (plugin_api_)
         {
             Ptr<IVideoCapture> cap = legacy::PluginCapture::create(plugin_api_, std::string(), camera); //.staticCast<IVideoCapture>();
