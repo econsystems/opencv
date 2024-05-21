@@ -19,7 +19,6 @@
 #include <pthread.h>
 #include <mutex>
 #include <chrono>
-// #include <time.h>
 #include <sys/time.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -83,7 +82,7 @@ int minimum = 0, maximum = 0, defaultValue = 0, currentValue = 0, steppingDelta 
 vector< pair <int, String> > uvcProperty;
 unsigned char outputBuffer[BUFFERLENGTH], inputBuffer[BUFFERLENGTH];
 String deviceName, vid, pid, devicePath, formatType, CurrFormatType;
-bool bOpenHID = false, bCapture, bPreview, bSwitch, _12CUNIR, _CU51, _CU40, _10CUG_C, _CU55M, _20CUG, _CU135, _27CUG, _CU83, _50CUG_M;
+bool bOpenHID = false, bCapture, bPreview, bSwitch, _12CUNIR, _CU51, _CU40, _10CUG_C, _CU55M, _20CUG, _CU135, _27CUG, _CU83, _50CUG_M, _50CUG;
 mutex mu;
 uchar* Y12Buff, *Y16Buff, *StillBuff, *PixelBuff, *RGBIRBuff, *RGBBuffCU83, *IRBuffCU83 ,*IRBuffY8 = NULL; // PixelBuff is for _CU55M used to convert Y12 to Y8, initial resolution of the device is 640x480..
 uchar* input27CugBuffer;
@@ -113,7 +112,6 @@ bool exploreCam();
 
 bool bReadSet(int tid, bool bRead)
 {
-	// cout<<"\n bReadSet";
 	std::lock_guard<std::mutex> guard(mu);
 
 	if (tid == 1)
@@ -127,7 +125,6 @@ bool bReadSet(int tid, bool bRead)
 
 bool bPreviewSet(int tid, bool bPrev)
 {
-	// cout<<"\n bPreviewSet";
 	std::lock_guard<std::mutex> guard(mu);
 
 	if (tid == 1)
@@ -212,13 +209,11 @@ bool getCurrentFormat() {
 		Y12Format = false;
 	if (formatType == "Y16 ")
 	{
-		cout<<"\nY16True in getCurrentFormat";
 		Y16Format = true;
 		Y16Cu83Format = true;
 	}
 	else
 	{
-		cout<<"\nY16False in getCurrentFormat";
 		Y16Format = false;
 		Y16Cu83Format = false;
 	}
@@ -227,7 +222,6 @@ bool getCurrentFormat() {
 	if ((_CU55M || _50CUG_M))
 		PixelBuff = new uchar[curWidth * curHeight];
 
-	/** cout<<"\n getCurrentFormat Completed"; **/
 	return true;
 }
 
@@ -644,27 +638,19 @@ void *preview(void *arg)
 	{
 		while (bPreviewSet(2, true))
 		{
-			// cout<<"\n inPreview";
 			if (bReadSet(2, true))
 			{
 				cap >> Frame;
-				// cout<<"\n FrameRecieved";
 			}
 
-			cout<<"\n BeforeFramesCheck";
 			if (!Frame.empty())
 			{
-				// cout<<"\n FirstLine";
 				if (checkFormat) {  // Call getCurrentFormat API,where we will get the initial set format and Resolution.
-				    // cout<<"\n currentFormat_1: "<<checkFormat;
 					getCurrentFormat();
 					checkFormat = false;  // Make it false,as it is used only once,just to get the initial set values.
-					// cout<<"\n currentFormat_2: "<<checkFormat;
 				}
-				// cout<<"\n BeforeCameraChecking";
 				if ((_12CUNIR) || (_CU51))
 				{
-					// cout<<"\n Camera_1";
 					//Convert to 8 Bit:
 					//Scale the 12 Bit (4096) Pixels into 8 Bit(255) (255/4096)= 0.06226
 					convertScaleAbs(Frame, ResultImage, 0.06226);
@@ -673,7 +659,6 @@ void *preview(void *arg)
 				}
 				else if (_CU40)
 				{
-					cout<<"\n Camera_2";
 					//Convert to 8 Bit:
 					//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.249023
 					convertScaleAbs(Frame, BayerFrame8, 0.249023);
@@ -692,7 +677,6 @@ void *preview(void *arg)
 				}
 				else if (_27CUG)
 				{
-					cout<<"\n Camera_3";
 					ConvertRGBIR(Frame, RGBImage27CUG , IRImage27CUG);
 
 					if (!RGBImage27CUG.empty())
@@ -709,91 +693,73 @@ void *preview(void *arg)
 				}
 				else if (_CU83 && Y16Format)
 				{
-					cout<<"\n started";
-                   struct timeval  tv, m_tv, res_time;
-
 					if (Frame.cols == 4440 && Frame.rows == 2160)
 					{
-						cout<<"\n inside_0";
 						if(RGBImageCU83.empty())
 						{
-							RGBImageCU83 = Mat(2160, 3840, CV_8UC2); //allocation
-							cout<<"\n inside_00";
+							RGBImageCU83 = Mat(2160, 3840, CV_8UC2); 
 						}
 						if (IRImageCU83.empty())
 						{
 							IRImageCU83 = Mat(1080, 1920, CV_8UC1);
-							cout<<"\n inside_1";
 						}
 
-                        gettimeofday(&m_tv, NULL);
-
 						SeparatingRGBIRBuffers(Frame, &IRImageCU83, &RGBImageCU83, &RGBBufferSizeCU83, &IRBufferSizeCU83);
-
-						gettimeofday(&tv, NULL);
-                        timersub(&tv, &m_tv, &res_time);
-                        cout<< "Time taken (in ms) by PrepareCU83Buffer() :" << ((int)((res_time.tv_sec*1000)+(res_time.tv_usec/1000)));
 						
-						cout<<"\n inside_2";
 						if (!RGBImageCU83.empty())
 						{
-							cout<<"\n inside_3";
 							cvtColor(RGBImageCU83, ResultImage, COLOR_YUV2BGR_UYVY);
 							namedWindow("OpenCVCam RGB Frame", WINDOW_AUTOSIZE);
 							imshow("OpenCVCam RGB Frame", ResultImage);
-							cout<<"\n inside_4";
 						}
 						if (!IRImageCU83.empty())
 						{
-							cout<<"\n inside_5";
 							namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
 							imshow("OpenCVCam IR Frame", IRImageCU83);
-							cout<<"\n inside_6";
 						}
 					}
-					else
+					else if (Frame.cols == 3840 && Frame.rows == 1350)
 					{
-						if (Frame.cols == 3840 && Frame.rows == 1350)
-						{
-							int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
-							IRImageCU83 = Mat(2160, 3840, CV_8UC1);
-							ConvertRAW10toRAW8(Frame, IRImageCU83);
-							namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-							imshow("OpenCVCam", IRImageCU83);
-						}
-						else if ((Frame.cols == 1920 && Frame.rows == 675))
-						{
-							int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
-							IRImageCU83 = Mat(1080, 1920, CV_8UC1);
-							ConvertRAW10toRAW8(Frame, IRImageCU83);
-							namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-							imshow("OpenCVCam", IRImageCU83);
-						}
+						int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
+						IRImageCU83 = Mat(2160, 3840, CV_8UC1);
+						ConvertRAW10toRAW8(Frame, IRImageCU83);
+						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+						imshow("OpenCVCam", IRImageCU83);
 					}
-					cout<<"\n ConverstionDone";
+					else if ((Frame.cols == 1920 && Frame.rows == 675))
+					{
+						int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
+						IRImageCU83 = Mat(1080, 1920, CV_8UC1);
+						ConvertRAW10toRAW8(Frame, IRImageCU83);
+						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+						imshow("OpenCVCam", IRImageCU83);
+					}else{
+						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					    imshow("OpenCVCam", Frame);
+					}
 				}
 				else if (_10CUG_C) //10CUG and other camera's
 				{
-					cout<<"\n Camera_5";
 					cvtColor(Frame, BGRImage, COLOR_BayerGB2BGR);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", BGRImage);
 				}
+				else if(_50CUG){//50CUG Color Camera
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", Frame);
+				}
 				else if ((_50CUG_M || _CU55M) && Y12Format) {    // Will allow for the Conversion only if format is Y12.Skip conversion if it is Y8.
-					cout<<"\n Camera_6";
 					ConvertY12toY8(Frame, ResultImage);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
 				else if ((_CU135 || _20CUG) && (Y16Format)) // included _CU135
 				{
-					cout<<"\n Camera_7";
 					//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.2490234375
 					convertScaleAbs(Frame, ResultImage, 0.2490234375);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				// #ifdef _WIN32
 				// added for UYVY format stream with appropriate conversions
 				else if (formatType.substr(0, 4) == "UYVY")
 				{
@@ -808,18 +774,12 @@ void *preview(void *arg)
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				// #endif
 				else
 				{
-					// cout<<"\nelse";
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", Frame);
 				}
 			}
-			else{
-				cout<<"\n EmptyFrame";
-			}
-
 
 			keyPressed = waitKey(5);
 
@@ -976,6 +936,7 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 		else if ((vid == "2560") && (pid == "c140"))
 		{
@@ -989,6 +950,7 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 		else if ((vid == "2560") && (pid == "c152"))
 		{
@@ -1002,6 +964,7 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 		else if ((vid == "2560") && (pid == "c113"))
 		{
@@ -1015,6 +978,7 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 		else if ((vid == "2560") && (pid == "c111"))
 		{
@@ -1028,6 +992,7 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 		else if ((vid == "2560") && (pid == "c155"))
 		{
@@ -1041,6 +1006,7 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 		else if ((vid == "2560") && (pid == "c124"))
 		{
@@ -1054,6 +1020,7 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 		else if ((vid == "2560") && (pid == "0121"))
 		{
@@ -1067,6 +1034,7 @@ bool listDevices()
 			_27CUG = true;
 			_CU83 = false;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 		else if ((vid == "2560") && (pid == "c188"))
 		{
@@ -1080,6 +1048,7 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = true;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 		else if ((vid == "2560") && (pid == "c157"))
 		{
@@ -1093,6 +1062,21 @@ bool listDevices()
 		_27CUG = false;
 		_CU83 = false;
 		_50CUG_M = true;
+		_50CUG = false;
+		}
+		else if ((vid == "2560") && (pid == "c15a"))
+		{
+		_CU40 = false;
+		_CU51 = false;
+		_12CUNIR = false;
+		_10CUG_C = false;
+		_CU55M = false;
+		_20CUG = false;
+		_CU135 = false;
+		_27CUG = false;
+		_CU83 = false;
+		_50CUG_M = false;
+		_50CUG = true;
 		}
 		else
 		{
@@ -1106,6 +1090,7 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
+			_50CUG = false;
 		}
 
 		if (cap.isOpened())
@@ -1171,7 +1156,7 @@ bool listDevices()
 		}
 		else if ((vid == "2560") && (pid == "c140")  || (pid == "c152") || (pid == "0121") || (pid == "c113") || (pid == "c111") || (pid == "c155") || (pid == "c124") || (pid == "c1d8" || pid == "c1d7" || pid == "c0d7"))
 		{
-			cap.set(CAP_PROP_CONVERT_RGB/*CV_CAP_PROP_CONVERT_RGB*/, false);
+			cap.set(CAP_PROP_CONVERT_RGB, false);
 		}
 
 #ifdef _WIN32
@@ -1255,7 +1240,6 @@ bool listDevices()
 
 
 //Configuring Camera Format/Resolution
-//
 bool configFormats()
 {
 	while ((dilemma == 'y') || (dilemma == 'Y'))
@@ -1344,9 +1328,7 @@ bool configFormats()
 			{
 				cout << "\n\t **** The Current set Format type = " << formatType << " Width = " << width << " Height = " << height << " FPS = " << fps << " ****\n\n";
 			}
-			else{
-				cout<<"\n Not Printed";
-			}
+
 			if ((_CU55M || _50CUG_M))
 				PixelBuff = new uchar[width * height];
 
@@ -1371,14 +1353,9 @@ bool configFormats()
 			else
 				Y12Format = false;
 
-			if (formatType == "Y16 ")
-			{
-				cout<<"\nY16True";
+			if (formatType == "Y16 "){
 				Y16Format = true;
-			}
-			else
-			{
-				cout<<"\nY16False";
+			}else{
 				Y16Format = false;
 			}
 #endif
@@ -2139,7 +2116,6 @@ bool exploreCam()
 			break;
 
 		case 3:
-		    /** cout<<"\n configUVCSettings"; **/
 			if (!configUVCSettings())
 			{
 				cout << endl << "UVC Settings Configuration is Failed" << endl;
