@@ -6,10 +6,12 @@
 #include <tchar.h>
 #include <string>
 #include <conio.h>
+#include <strsafe.h>
 
 #include "opencv2\imgproc\imgproc.hpp"
 #include "opencv2\highgui\highgui.hpp"
 #include "imgcodecs.hpp"
+
 #include <mutex>
 #endif
 
@@ -19,6 +21,7 @@
 #include <pthread.h>
 #include <mutex>
 #include <chrono>
+// #include <time.h>
 #include <sys/time.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -55,12 +58,26 @@ using namespace cv;
 
 #define PROPERTY			19
 
-typedef BOOL(*Readfirmwareversion_t) (UINT8 *, UINT8 *, UINT16 *, UINT16 *);
-typedef BOOL(*Initextensionunit_t) (TCHAR *);
-typedef BOOL(*Deinitextensionunit_t) ();
-Readfirmwareversion_t readfirmwareversion;
+typedef BOOL(*Readfirmwareversion_t)(uint32_t* Handle, uint8_t* pMajorVersion, uint8_t* pMinorVersion1, uint16_t* pMinorVersion2, uint16_t* pMinorVersion3);
+typedef BOOL(*Initextensionunit_t)(TCHAR* USBInstanceID, uint32_t** handle);
+typedef BOOL(*Deinitextensionunit_t)(uint32_t* handle);
+typedef BOOL(*Readfirmwareversion82USB_t) (uint32_t*, uint8_t *, uint8_t *, uint16_t *);
+typedef BOOL(*ReadfirmwareversionTania_t) (uint32_t*, CHAR *);
+typedef BOOL(*ReadfirmwareversionECAM22USB_t) (uint32_t*, uint8_t , uint8_t *);
+typedef BOOL(*ReadfirmwareversionECAM51_t) (uint32_t* , uint8_t *);
+typedef BOOL(*Readfirmwareversion83USB_t) (uint32_t*, uint8_t *, uint8_t *, uint16_t * , uint32_t*);
+typedef BOOL(*InitextensionunitExt_t)(uint32_t** handle , TCHAR* USBInstanceID);
+
 Initextensionunit_t initextensionunit;
+InitextensionunitExt_t initextensionunitExt;
 Deinitextensionunit_t deinitextensionunit;
+Readfirmwareversion_t readfirmwareversion;
+Readfirmwareversion83USB_t readfirmwareversion83USB;
+ReadfirmwareversionECAM51_t readfirmwareversionECAM51;
+ReadfirmwareversionECAM22USB_t readfirmwareversionECAM22;
+ReadfirmwareversionTania_t readfirmwareversionTANIA;
+Readfirmwareversion82USB_t readfirmwareversion82USB;
+
 
 #elif __linux__
 
@@ -82,18 +99,21 @@ int minimum = 0, maximum = 0, defaultValue = 0, currentValue = 0, steppingDelta 
 vector< pair <int, String> > uvcProperty;
 unsigned char outputBuffer[BUFFERLENGTH], inputBuffer[BUFFERLENGTH];
 String deviceName, vid, pid, devicePath, formatType, CurrFormatType;
-bool bOpenHID = false, bCapture, bPreview, bSwitch, _12CUNIR, _CU51, _CU40, _10CUG_C, _CU55M, _20CUG, _CU135, _27CUG, _CU83, _50CUG_M, _50CUG;
+bool bOpenHID = false, bCapture, bPreview, bSwitch, _12CUNIR, _CU51, _CU40, _10CUG_C, _CU55M, _20CUG, _CU135, _27CUG, _CU83, _50CUG_M, _CU83_H03R1, _37CUG, _16CUG, _512M, cameraswitch = false , IsExtDevice;
 mutex mu;
-uchar* Y12Buff, *Y16Buff, *StillBuff, *PixelBuff, *RGBIRBuff, *RGBBuffCU83, *IRBuffCU83 ,*IRBuffY8 = NULL; // PixelBuff is for _CU55M used to convert Y12 to Y8, initial resolution of the device is 640x480..
+uchar* Y12Buff, *Y16Buff, *StillBuff, *PixelBuff, *RGBIRBuff, *RGBBuffCU83, *IRBuffCU83, *IRBuffY8 = NULL; // PixelBuff is for _CU55M used to convert Y12 to Y8, initial resolution of the device is 640x480..
 uchar* input27CugBuffer;
-bool Y12Format = true, Y16Format = true, checkFormat = true, Y16Cu83Format = false;
+bool Y12Format = true, Y16Format = true, checkFormat = true, Y16Cu83Format = false, Y10Format = false;
 int countValue, writeReturnValue = 0;
 FILE *fp = NULL;
+uint32_t* handle = nullptr;
+
 
 #ifdef _WIN32
 
 TCHAR *tDevicePath;
 HINSTANCE hinstLib;
+HINSTANCE hinstLibExt;
 bool bDetach = false;
 thread t;
 
@@ -180,7 +200,11 @@ bool IsRawSaveSupport()
 {
 	String Format = DwordToFourCC(cap.get(CAP_PROP_FOURCC/*CV_CAP_PROP_FOURCC*/));
 
-	if (Format.substr(0, 4) == "UYVY" && !_27CUG || Format.substr(0, 4) == "YUY2" || Format.substr(0, 2) == "Y8" || Format.substr(0, 4) == "YUYV" || Format.substr(0, 3) == "Y16" && !_CU83 || (Format.substr(0, 3) == "Y16" && Frame.cols != 4440 && Frame.rows != 2160 && _CU83))
+	if (Format.substr(0, 4) == "UYVY" && !_27CUG 
+		|| Format.substr(0, 4) == "YUY2" 
+		|| Format.substr(0, 2) == "Y8" 
+		|| Format.substr(0, 4) == "YUYV"
+		|| Format.substr(0,2) == "Y16")
 		return true;
 	return false;
 }
@@ -202,26 +226,35 @@ bool getCurrentFormat() {
 		Y16Format = true;
 	else
 		Y16Format = false;
-#elif __linux__
-	if (formatType == "Y12 ")
-		Y12Format = true;
+
+	if (formatType.substr(0, 3) == "Y10")
+		Y10Format = true;
 	else
-		Y12Format = false;
-	if (formatType == "Y16 ")
-	{
+		Y10Format = false;
+#elif __linux__
+
+	if (formatType.substr(0, 3) == "Y12") {
+		Y12Format = true;
+	}
+	else if (formatType.substr(0, 3) == "Y16") {
 		Y16Format = true;
 		Y16Cu83Format = true;
 	}
-	else
-	{
+	else if (formatType.substr(0, 3) == "Y10") {
+		Y10Format = true;
+	}
+	else {
+		Y10Format = false;
+		Y12Format = false;
 		Y16Format = false;
 		Y16Cu83Format = false;
 	}
 #endif
 
-	if ((_CU55M || _50CUG_M))
+	if ((_CU55M || _50CUG_M || _37CUG || _512M))
 		PixelBuff = new uchar[curWidth * curHeight];
 
+	/** cout<<"\n getCurrentFormat Completed"; **/
 	return true;
 }
 
@@ -329,6 +362,7 @@ bool SeparatingRGBIRBuffers(Mat Frame, Mat* IRImageCU83, Mat* RGBImageCU83, int 
 {
 	RGBIRBuff = Frame.data;
 	int long size = Frame.cols*Frame.rows * 2;
+
 	int Buffcnt = 0;
 	int cnt = 0;
 	int RGBBufsize = 0;
@@ -338,25 +372,65 @@ bool SeparatingRGBIRBuffers(Mat Frame, Mat* IRImageCU83, Mat* RGBImageCU83, int 
 	int rgbcnt = 0, Ircnt = 0;
 	BYTE * IRBuff = NULL;
 	IRBuff = (BYTE*)malloc(1920 * 1080 * 2);
-	while (size > 0)
+	int long BuffSize = 3120 * 1080 * 2;
+
+	// Updated the seperation logic to support 3120x1080 resolution - commented by Adithya TS
+	if ((Frame.cols == 3120 && Frame.rows == 1080))
 	{
-		if ((RGBIRBuff[Buffcnt] & 0x01) == 0)
+		int rgbbuffsize = 1920 * 1080 * 2;
+		int irbuffsize = 2592000;
+
+		while (BuffSize > 0)
 		{
-			memcpy(RGBImageCU83->data + (RGBBufsize), RGBIRBuff + Buffcnt, 7679);
-			Buffcnt += 7680;
-			RGBBufsize += 7680;
-			size -= 7680;
-			rgbcnt += 1;
-		}
-		else
-		{
+			if ((RGBIRBuff[Buffcnt] & 0x03) == 0x00)
+			{
+				memcpy(RGBImageCU83->data + (RGBBufsize), RGBIRBuff + Buffcnt, 3839);
+				Buffcnt += 3840;
+				RGBBufsize += 3840;
+				BuffSize -= 3840;
+				rgbcnt += 1;
+			}
+			else if ((RGBIRBuff[Buffcnt] & 0x03) == 0x03)
+			{
 				memcpy(IRBuff + (IrBufsize), RGBIRBuff + Buffcnt, 2399);
-			    IrBufsize += 2400;
+				IrBufsize += 2400;
+				Buffcnt += 2400;
+				BuffSize -= 2400;
+				Ircnt += 1;
+			}
+			else
+			{
+				return 0;
+			}
+			cnt++;
+		}
+	}
+	else
+	{
+		while (size > 0)
+		{
+			if ((RGBIRBuff[Buffcnt] & 0x03) == 0x00)
+			{
+				memcpy(RGBImageCU83->data + (RGBBufsize), RGBIRBuff + Buffcnt, 7679);
+				Buffcnt += 7680;
+				RGBBufsize += 7680;
+				size -= 7680;
+				rgbcnt += 1;
+			}
+			else if ((RGBIRBuff[Buffcnt] & 0x03) == 0x03)
+			{
+				memcpy(IRBuff + (IrBufsize), RGBIRBuff + Buffcnt, 2399);
+				IrBufsize += 2400;
 				Buffcnt += 2400;
 				size -= 2400;
 				Ircnt += 1;
+			}
+			else
+			{
+				return 0;
+			}
+			cnt++;
 		}
-		cnt++;
 	}
 
 	int bufsize_IR = 0;
@@ -374,7 +448,7 @@ bool SeparatingRGBIRBuffers(Mat Frame, Mat* IRImageCU83, Mat* RGBImageCU83, int 
 	*IRBufferSizeCU83 = IrBufsize;
 	free(IRBuff);
 	// IRBuff = NULL; //Added by Sushanth - Assigning IRBuff to NULL when it is freed.
-	return 1;
+	return 1; 
 }
 
 /**
@@ -392,27 +466,67 @@ bool SeparatingRGBIRBufferStillCapture(Mat Frame, Mat* IRImageCU83, Mat* RGBImag
 	uint32_t IrBufsize = 0;
 	int ir = 0;
 	int rgbcnt = 0, Ircnt = 0;
+	BYTE * IRBuff = NULL;
+	IRBuff = (BYTE*)malloc(1920 * 1080 * 2);
+	int long BuffSize = 3120 * 1080 * 2;
 
-	while (size > 0)
+	if ((Frame.cols == 3120 && Frame.rows == 1080))
 	{
-		if ((RGBIRBuff[Buffcnt] & 0x01) == 0)
-		{
-			memcpy(RGBImageCU83->data + (RGBBufsize), RGBIRBuff + Buffcnt, 7679);
-			Buffcnt += 7680;
-			RGBBufsize += 7680;
-			size -= 7680;
-			rgbcnt += 1;
-		}
-		else {
-			memcpy(IRImageCU83->data + (IrBufsize), RGBIRBuff + Buffcnt, 2399);
-			IrBufsize += 2400;
-			Buffcnt += 2400;
-			size -= 2400;
-			Ircnt += 1;
-		}
-		cnt++;
-	}
+		int rgbbuffsize = 1920 * 1080 * 2;
+		int irbuffsize = 2592000;
 
+		while (BuffSize > 0)
+		{
+			if ((RGBIRBuff[Buffcnt] & 0x03) == 0x00)
+			{
+				memcpy(RGBImageCU83->data + (RGBBufsize), RGBIRBuff + Buffcnt, 3839);
+				Buffcnt += 3840;
+				RGBBufsize += 3840;
+				BuffSize -= 3840;
+				rgbcnt += 1;
+			}
+			else if ((RGBIRBuff[Buffcnt] & 0x03) == 0x03)
+			{
+				memcpy(IRBuff + (IrBufsize), RGBIRBuff + Buffcnt, 2399);
+				IrBufsize += 2400;
+				Buffcnt += 2400;
+				BuffSize -= 2400;
+				Ircnt += 1;
+			}
+			else
+			{
+				return 0;
+			}
+			cnt++;
+		}
+	}
+	else {
+
+		while (size > 0)
+		{
+			if ((RGBIRBuff[Buffcnt] & 0x03) == 0)
+			{
+				memcpy(RGBImageCU83->data + (RGBBufsize), RGBIRBuff + Buffcnt, 7679);
+				Buffcnt += 7680;
+				RGBBufsize += 7680;
+				size -= 7680;
+				rgbcnt += 1;
+			}
+			else if ((RGBIRBuff[Buffcnt] & 0x03) == 0x03)
+			{
+				memcpy(IRImageCU83->data + (IrBufsize), RGBIRBuff + Buffcnt, 2399);
+				IrBufsize += 2400;
+				Buffcnt += 2400;
+				size -= 2400;
+				Ircnt += 1;
+			}
+			else
+			{
+				return 0;
+			}
+			cnt++;
+		}
+	}
 	Buffcnt = 0;
 	*RGBBufferSizeCU83 = RGBBufsize;
 	*IRBufferSizeCU83 = IrBufsize;
@@ -430,7 +544,7 @@ bool ConvertRAW10toRAW8(Mat pBufIn, Mat pBufOut)
 	uint32_t IrBufsize = 0;
 	int bufsize_IR = 0;
 	Buffcnt = 0;
-	int size = (pBufIn.elemSize1() * pBufIn.total() * pBufIn.channels());
+	size_t size = (pBufIn.elemSize1() * pBufIn.total() * pBufIn.channels());
 	while (size > 0)
 	{
 		memcpy(pBufOut.data + (bufsize_IR), pBufIn.data + Buffcnt, 4);
@@ -478,13 +592,19 @@ void stream()
 	while (true)
 	{
 		while (bPreviewSet(2, true))
-		{
+		{			
 			if (bReadSet(2, true))
 			{
 				cap >> Frame;
 			}
+			
 			if (!Frame.empty())
 			{
+				if (cameraswitch == true)
+				{
+					cameraswitch = false;
+					cv::destroyAllWindows();					
+				}
 				if (checkFormat) {  // Call getCurrentFormat API,where we will get the initial set format and Resolution.
 					getCurrentFormat();
 					checkFormat = false;  // Make it false,as it is used only once,just to get the initial set values.
@@ -519,7 +639,7 @@ void stream()
 				}
 				else if (_27CUG)
 				{
-					ConvertRGBIR(Frame, RGBImage27CUG , IRImage27CUG);
+					ConvertRGBIR(Frame, RGBImage27CUG, IRImage27CUG);
 
 					if (!RGBImage27CUG.empty())
 					{
@@ -533,31 +653,32 @@ void stream()
 						imshow("OpenCVCam IR Frame", IRImage27CUG);
 					}
 				}
-				else if (_CU83 && Y16Format)
+				else if ((_CU83 && Y16Format) || (_CU83_H03R1 && Y16Format))
 				{
 					if (Frame.cols == 4440 && Frame.rows == 2160)
 					{
 						RGBImageCU83 = Mat(2160, 3840, CV_8UC2); //allocation
 						IRImageCU83 = Mat(1080, 1920, CV_8UC1);
-						SeparatingRGBIRBuffers(Frame, &IRImageCU83, &RGBImageCU83, &RGBBufferSizeCU83, &IRBufferSizeCU83);
-
-						if (!RGBImageCU83.empty())
+						if (SeparatingRGBIRBuffers(Frame, &IRImageCU83, &RGBImageCU83, &RGBBufferSizeCU83, &IRBufferSizeCU83) == 1)
 						{
-							cvtColor(RGBImageCU83, ResultImage, COLOR_YUV2BGR_UYVY);
-							namedWindow("OpenCVCam RGB Frame", WINDOW_AUTOSIZE);
-							imshow("OpenCVCam RGB Frame", ResultImage);
-						}
-						if (!IRImageCU83.empty())
-						{
-							namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
-							imshow("OpenCVCam IR Frame", IRImageCU83);
+							if (!RGBImageCU83.empty())
+							{
+								cvtColor(RGBImageCU83, ResultImage, COLOR_YUV2BGR_UYVY);
+								namedWindow("OpenCVCam RGB Frame", WINDOW_AUTOSIZE);
+								imshow("OpenCVCam RGB Frame", ResultImage);
+							}
+							if (!IRImageCU83.empty())
+							{
+								namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
+								imshow("OpenCVCam IR Frame", IRImageCU83);
+							}
 						}
 					}
 					else
 					{
 						if (Frame.cols == 3840 && Frame.rows == 1350)
 						{
-							int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
+							size_t size = (Frame.elemSize1() * Frame.total() * Frame.channels());
 							IRImageCU83 = Mat(2160, 3840, CV_8UC1);
 							ConvertRAW10toRAW8(Frame, IRImageCU83);
 							namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
@@ -565,32 +686,57 @@ void stream()
 						}
 						else if ((Frame.cols == 1920 && Frame.rows == 675))
 						{
-							int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
+							size_t size = (Frame.elemSize1() * Frame.total() * Frame.channels());
 							IRImageCU83 = Mat(1080, 1920, CV_8UC1);
 							ConvertRAW10toRAW8(Frame, IRImageCU83);
 							namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 							imshow("OpenCVCam", IRImageCU83);
 						}
-					}
+						else if ((Frame.cols == 3120 && Frame.rows == 1080))
+						{
+							RGBImageCU83 = Mat(1080, 1920, CV_8UC2); //allocation
+							IRImageCU83 = Mat(1080, 1920, CV_8UC1);
+							SeparatingRGBIRBuffers(Frame, &IRImageCU83, &RGBImageCU83, &RGBBufferSizeCU83, &IRBufferSizeCU83);
 
+							if (!RGBImageCU83.empty())
+							{
+								cvtColor(RGBImageCU83, ResultImage, COLOR_YUV2BGR_UYVY);
+								namedWindow("OpenCVCam RGB Frame", WINDOW_AUTOSIZE);
+								imshow("OpenCVCam RGB Frame", ResultImage);
+							}
+							if (!IRImageCU83.empty())
+							{
+								namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
+								imshow("OpenCVCam IR Frame", IRImageCU83);
+							}
+						}
+					}
 				}
-				else if ((_CU55M || _50CUG_M )&& Y12Format )
+				else if ((_CU55M || _50CUG_M || _37CUG || _512M) && Y12Format)
 				{
 					ConvertY12toY8(Frame, ResultImage);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				else if ((_CU135 || _20CUG) && (Y16Format)) // included _CU135
+				else if ((_CU135 || _20CUG || _16CUG) && (Y16Format)) // included _CU135
 				{
 					//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.2490234375
 					convertScaleAbs(Frame, ResultImage, 0.2490234375);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				#ifdef _WIN32
+
+				//Add support for Y10 format - Input file size is Y16 frame, so it should render as Y16 frame.
+				else if (formatType.substr(0, 4) == "Y10 ") {
+					convertScaleAbs(Frame, ResultImage, 0.2490234375);
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", ResultImage);
+				}
 				// added for UYVY format stream with appropriate conversions
 				else if (formatType.substr(0, 4) == "UYVY")
 				{
+					//std::cout << "Format Type (first 4 chars): " << formatType.substr(0, 4) << std::endl;
+
 					cvtColor(Frame, ResultImage, COLOR_YUV2BGR_UYVY);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
@@ -602,11 +748,34 @@ void stream()
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				#endif
 				else
 				{
-					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-					imshow("OpenCVCam", Frame);
+					//std::cout << "Format Type (first 4 chars): " << formatType.substr(0, 4) << std::endl;
+
+					if (Frame.channels() == 2) 
+					{
+						//std::cout << "Number of channels in the frame ++: " << Frame.channels() << std::endl;
+						if (formatType.substr(0, 4) == "YUY2")
+						{
+							//std::cout << "Number of channels in the frame 3: " << Frame.channels() << std::endl;
+							cvtColor(Frame, ResultImage, COLOR_YUV2BGR_YUY2);
+						}
+						else if (formatType.substr(0, 4) == "UYVY")
+						{
+							//std::cout << "Number of channels in the frame 4: " << Frame.channels() << std::endl;
+							cvtColor(Frame, ResultImage, COLOR_YUV2BGR_UYVY);
+						}
+					
+						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+						imshow("OpenCVCam", ResultImage);
+						
+					}
+					else
+					{
+						//std::cout << "Number of channels in the frame --: " << Frame.channels() << std::endl;
+						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+						imshow("OpenCVCam", Frame);
+					}				
 				}
 			}
 
@@ -677,7 +846,7 @@ void *preview(void *arg)
 				}
 				else if (_27CUG)
 				{
-					ConvertRGBIR(Frame, RGBImage27CUG , IRImage27CUG);
+					ConvertRGBIR(Frame, RGBImage27CUG, IRImage27CUG);
 
 					if (!RGBImage27CUG.empty())
 					{
@@ -691,21 +860,29 @@ void *preview(void *arg)
 						imshow("OpenCVCam IR Frame", IRImage27CUG);
 					}
 				}
-				else if (_CU83 && Y16Format)
+				else if (_CU83 && Y16Format || (_CU83_H03R1 && Y16Format))
 				{
+					struct timeval  tv, m_tv, res_time;
+
 					if (Frame.cols == 4440 && Frame.rows == 2160)
 					{
-						if(RGBImageCU83.empty())
+						if (RGBImageCU83.empty())
 						{
-							RGBImageCU83 = Mat(2160, 3840, CV_8UC2); 
+							RGBImageCU83 = Mat(2160, 3840, CV_8UC2); //allocation
 						}
 						if (IRImageCU83.empty())
 						{
 							IRImageCU83 = Mat(1080, 1920, CV_8UC1);
 						}
 
+						gettimeofday(&m_tv, NULL);
+
 						SeparatingRGBIRBuffers(Frame, &IRImageCU83, &RGBImageCU83, &RGBBufferSizeCU83, &IRBufferSizeCU83);
-						
+
+						gettimeofday(&tv, NULL);
+						timersub(&tv, &m_tv, &res_time);
+						//cout << "Time taken (in ms) by PrepareCU83Buffer() :" << ((int)((res_time.tv_sec * 1000) + (res_time.tv_usec / 1000)));
+
 						if (!RGBImageCU83.empty())
 						{
 							cvtColor(RGBImageCU83, ResultImage, COLOR_YUV2BGR_UYVY);
@@ -718,25 +895,44 @@ void *preview(void *arg)
 							imshow("OpenCVCam IR Frame", IRImageCU83);
 						}
 					}
-					else if (Frame.cols == 3840 && Frame.rows == 1350)
+					else
 					{
-						int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
-						IRImageCU83 = Mat(2160, 3840, CV_8UC1);
-						ConvertRAW10toRAW8(Frame, IRImageCU83);
-						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-						imshow("OpenCVCam", IRImageCU83);
+						if (Frame.cols == 3840 && Frame.rows == 1350)
+						{
+							int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
+							IRImageCU83 = Mat(2160, 3840, CV_8UC1);
+							ConvertRAW10toRAW8(Frame, IRImageCU83);
+							namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+							imshow("OpenCVCam", IRImageCU83);
+						}
+						else if ((Frame.cols == 1920 && Frame.rows == 675))
+						{
+							int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
+							IRImageCU83 = Mat(1080, 1920, CV_8UC1);
+							ConvertRAW10toRAW8(Frame, IRImageCU83);
+							namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+							imshow("OpenCVCam", IRImageCU83);
+						}
+						else if ((Frame.cols == 3120 && Frame.rows == 1080))
+						{
+							RGBImageCU83 = Mat(1080, 1920, CV_8UC2); //allocation
+							IRImageCU83 = Mat(1080, 1920, CV_8UC1);
+							SeparatingRGBIRBuffers(Frame, &IRImageCU83, &RGBImageCU83, &RGBBufferSizeCU83, &IRBufferSizeCU83);
+
+							if (!RGBImageCU83.empty())
+							{
+								cvtColor(RGBImageCU83, ResultImage, COLOR_YUV2BGR_UYVY);
+								namedWindow("OpenCVCam RGB Frame", WINDOW_AUTOSIZE);
+								imshow("OpenCVCam RGB Frame", ResultImage);
+							}
+							if (!IRImageCU83.empty())
+							{
+								namedWindow("OpenCVCam IR Frame", WINDOW_AUTOSIZE);
+								imshow("OpenCVCam IR Frame", IRImageCU83);
+							}
+						}
 					}
-					else if ((Frame.cols == 1920 && Frame.rows == 675))
-					{
-						int size = (Frame.elemSize1() * Frame.total() * Frame.channels());
-						IRImageCU83 = Mat(1080, 1920, CV_8UC1);
-						ConvertRAW10toRAW8(Frame, IRImageCU83);
-						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-						imshow("OpenCVCam", IRImageCU83);
-					}else{
-						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-					    imshow("OpenCVCam", Frame);
-					}
+					cout << "\n ConverstionDone";
 				}
 				else if (_10CUG_C) //10CUG and other camera's
 				{
@@ -744,28 +940,55 @@ void *preview(void *arg)
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", BGRImage);
 				}
-				else if(_50CUG){//50CUG Color Camera
-					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-					imshow("OpenCVCam", Frame);
-				}
-				else if ((_50CUG_M || _CU55M) && Y12Format) {    // Will allow for the Conversion only if format is Y12.Skip conversion if it is Y8.
+				else if ((_CU55M || _50CUG_M || _37CUG || _512M) && Y12Format) {    // Will allow for the Conversion only if format is Y12.Skip conversion if it is Y8.
 					ConvertY12toY8(Frame, ResultImage);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
-				else if ((_CU135 || _20CUG) && (Y16Format)) // included _CU135
+				else if ((_CU135 || _20CUG || _16CUG) && (Y16Format)) // included _CU135
 				{
 					//Scale the 10 Bit (1024) Pixels into 8 Bit(255) (255/1024)= 0.2490234375
 					convertScaleAbs(Frame, ResultImage, 0.2490234375);
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
+				} //Add support for Y10 format - Input file size is Y16 frame, so it should render as Y16 frame.
+				else if (formatType.substr(0, 4) == "Y10 ") {
+					convertScaleAbs(Frame, ResultImage, 0.2490234375);
+					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					imshow("OpenCVCam", ResultImage);
 				}
+				// #ifdef _WIN32
 				// added for UYVY format stream with appropriate conversions
 				else if (formatType.substr(0, 4) == "UYVY")
 				{
-					cvtColor(Frame, ResultImage, COLOR_YUV2BGR_UYVY);
-					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
-					imshow("OpenCVCam", ResultImage);
+					// cvtColor(Frame, ResultImage, COLOR_YUV2BGR_UYVY);
+					// namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+					// imshow("OpenCVCam", ResultImage);
+
+					if (Frame.channels() == 2) 
+					{
+						//std::cout << "Number of channels in the frame 2: " << Frame.channels() << std::endl;
+						if (formatType.substr(0, 4) == "YUY2")
+						{
+							//std::cout << "Number of channels in the frame 3: " << Frame.channels() << std::endl;
+							cvtColor(Frame, ResultImage, COLOR_YUV2BGR_YUY2);
+						}
+						else if (formatType.substr(0, 4) == "UYVY")
+						{
+							//std::cout << "Number of channels in the frame 4: " << Frame.channels() << std::endl;
+							cvtColor(Frame, ResultImage, COLOR_YUV2BGR_UYVY);
+						}
+
+						//std::cout << "Number of channels in the frame 5: " << Frame.channels() << std::endl;
+						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+						imshow("OpenCVCam", ResultImage);
+					}
+					else
+					{
+						//std::cout << "Number of channels in the frame 0: " << Frame.channels() << std::endl;
+						namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
+						imshow("OpenCVCam", Frame);
+					}		
 				}
 				// added for YUY2 format stream with appropriate conversions
 				else if (formatType.substr(0, 4) == "YUY2")
@@ -774,12 +997,17 @@ void *preview(void *arg)
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", ResultImage);
 				}
+				// #endif
 				else
 				{
 					namedWindow("OpenCVCam", WINDOW_AUTOSIZE);
 					imshow("OpenCVCam", Frame);
 				}
 			}
+			else {
+				cout << "\n EmptyFrame";
+			}
+
 
 			keyPressed = waitKey(5);
 
@@ -808,10 +1036,13 @@ int main()
 		cout << "The eCAMFwSw.dll is not loaded properly" << endl;
 		return 0;
 	}
+	hinstLibExt = LoadLibrary(L"eCAMFwExt.dll");
+	if (hinstLibExt == NULL)
+	{
+		cout << "The eCAMFwExt.dll is not loaded properly" << endl;
+		return 0;
+	}
 
-	readfirmwareversion = (Readfirmwareversion_t)GetProcAddress(hinstLib, "ReadFirmwareVersion");
-	initextensionunit = (Initextensionunit_t)GetProcAddress(hinstLib, "InitExtensionUnit");
-	deinitextensionunit = (Deinitextensionunit_t)GetProcAddress(hinstLib, "DeinitExtensionUnit");
 #endif
 
 	//Open a Camera Device
@@ -838,7 +1069,8 @@ int main()
 	}
 
 #ifdef _WIN32
-	t.detach();
+	if (bDetach)
+		t.detach();
 #endif
 
 	if (cap.isOpened())
@@ -854,6 +1086,9 @@ int main()
 
 bool listDevices()
 {
+	//// added by adithya for clearing the frames before switching another device
+	
+
 	checkFormat = true;
 	int camId = -1;
 	//List total Number of Devices
@@ -901,11 +1136,21 @@ bool listDevices()
 	switch (camId)
 	{
 	case EXIT:
+	
 #ifdef _WIN32
 
-		if (deinitextensionunit())
-			if (bDetach)
-				t.detach();
+		if (handle != NULL)
+		{
+			if (deinitextensionunit(handle))
+			{
+
+			}
+			handle = nullptr;
+		}
+
+		if (bDetach)
+			t.detach();
+
 		bSwitch = true;
 		if (cap.isOpened())
 			cap.release();
@@ -936,7 +1181,11 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
 		else if ((vid == "2560") && (pid == "c140"))
 		{
@@ -950,7 +1199,11 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
 		else if ((vid == "2560") && (pid == "c152"))
 		{
@@ -964,7 +1217,11 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
 		else if ((vid == "2560") && (pid == "c113"))
 		{
@@ -978,7 +1235,11 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
 		else if ((vid == "2560") && (pid == "c111"))
 		{
@@ -992,7 +1253,11 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
 		else if ((vid == "2560") && (pid == "c155"))
 		{
@@ -1006,7 +1271,11 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
 		else if ((vid == "2560") && (pid == "c124"))
 		{
@@ -1020,7 +1289,11 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
 		else if ((vid == "2560") && (pid == "0121"))
 		{
@@ -1034,7 +1307,11 @@ bool listDevices()
 			_27CUG = true;
 			_CU83 = false;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
 		else if ((vid == "2560") && (pid == "c188"))
 		{
@@ -1048,37 +1325,31 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = true;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
 		else if ((vid == "2560") && (pid == "c157"))
 		{
-		_CU40 = false;
-		_CU51 = false;
-		_12CUNIR = false;
-		_10CUG_C = false;
-		_CU55M = false;
-		_20CUG = false;
-		_CU135 = false;
-		_27CUG = false;
-		_CU83 = false;
-		_50CUG_M = true;
-		_50CUG = false;
+			_CU40 = false;
+			_CU51 = false;
+			_12CUNIR = false;
+			_10CUG_C = false;
+			_CU55M = false;
+			_20CUG = false;
+			_CU135 = false;
+			_27CUG = false;
+			_CU83 = false;
+			_50CUG_M = true;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
 		}
-		else if ((vid == "2560") && (pid == "c15a"))
-		{
-		_CU40 = false;
-		_CU51 = false;
-		_12CUNIR = false;
-		_10CUG_C = false;
-		_CU55M = false;
-		_20CUG = false;
-		_CU135 = false;
-		_27CUG = false;
-		_CU83 = false;
-		_50CUG_M = false;
-		_50CUG = true;
-		}
-		else
+		else if ((vid == "2560") && (pid == "c18d"))
 		{
 			_CU40 = false;
 			_CU51 = false;
@@ -1090,11 +1361,153 @@ bool listDevices()
 			_27CUG = false;
 			_CU83 = false;
 			_50CUG_M = false;
-			_50CUG = false;
+			_CU83_H03R1 = true;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
+		}
+		else if ((vid == "2560") && (pid == "c13a"))
+		{
+			_CU40 = false;
+			_CU51 = false;
+			_12CUNIR = false;
+			_10CUG_C = false;
+			_CU55M = false;
+			_20CUG = false;
+			_CU135 = false;
+			_27CUG = false;
+			_CU83 = false;
+			_50CUG_M = false;
+			_CU83_H03R1 = false;
+			_37CUG = true;
+			_16CUG = false;
+			_512M = false;
+			IsExtDevice = false;
+		}
+		else if ((vid == "2560") && (pid == "c117"))
+		{
+			_CU40 = false;
+			_CU51 = false;
+			_12CUNIR = false;
+			_10CUG_C = false;
+			_CU55M = false;
+			_20CUG = false;
+			_CU135 = false;
+			_27CUG = false;
+			_CU83 = false;
+			_50CUG_M = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = true;
+			_512M = false;
+		}
+		else if ((vid == "2560") && (pid == "c158"))
+		{
+			_CU40 = false;
+			_CU51 = false;
+			_12CUNIR = false;
+			_10CUG_C = false;
+			_CU55M = false;
+			_20CUG = false;
+			_CU135 = false;
+			_27CUG = false;
+			_CU83 = false;
+			_50CUG_M = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = true;
+			IsExtDevice = false;
+		}
+		else if ((vid == "2560") && (pid == "0102" || pid == "c123" || pid == "c129" || pid == "c05a" || pid == "c05c" || pid == "c181" || pid == "c184" || pid == "0035"))
+		{
+			IsExtDevice = true;
+			_CU40 = false;
+			_CU51 = false;
+			_12CUNIR = false;
+			_10CUG_C = false;
+			_CU55M = false;
+			_20CUG = false;
+			_CU135 = false;
+			_27CUG = false;
+			_CU83 = false;
+			_50CUG_M = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+		}
+		else
+		{
+			IsExtDevice = false;
+			_CU40 = false;
+			_CU51 = false;
+			_12CUNIR = false;
+			_10CUG_C = false;
+			_CU55M = false;
+			_20CUG = false;
+			_CU135 = false;
+			_27CUG = false;
+			_CU83 = false;
+			_50CUG_M = false;
+			_CU83_H03R1 = false;
+			_37CUG = false;
+			_16CUG = false;
+			_512M = false;
+		}
+#ifdef _WIN32
+		if (!IsExtDevice) 
+		{
+			readfirmwareversion = (Readfirmwareversion_t)GetProcAddress(hinstLib, "ReadFirmwareVersion");
+			initextensionunit = (Initextensionunit_t)GetProcAddress(hinstLib, "InitExtensionUnit");
+			deinitextensionunit = (Deinitextensionunit_t)GetProcAddress(hinstLib, "DeinitExtensionUnit");
+		}
+		else
+		{
+			if ((vid == "2560") && (pid == "0035")) { // tania
+				readfirmwareversionTANIA = (ReadfirmwareversionTania_t)GetProcAddress(hinstLibExt, "GetFirmwareVersion");
+				initextensionunitExt = (InitextensionunitExt_t)GetProcAddress(hinstLibExt, "InitTaniaExtensionUnit");
+				deinitextensionunit = (Deinitextensionunit_t)GetProcAddress(hinstLibExt, "DeinitExtUnit");
+			}
+			else if ((vid == "2560") && (pid == "0102" || pid == "c123" || pid == "c129")) // eCAM22
+			{
+				readfirmwareversionECAM22 = (ReadfirmwareversionECAM22USB_t)GetProcAddress(hinstLibExt, "GetFirmwareVersionECAM22");
+				initextensionunitExt = (InitextensionunitExt_t)GetProcAddress(hinstLibExt, "InitExtensionUnitECAM22");
+				deinitextensionunit = (Deinitextensionunit_t)GetProcAddress(hinstLibExt, "DeinitExtUnit");
+			}
+			else if ((vid == "2560") && (pid == "c05a")) // eCAM51A
+			{
+				readfirmwareversionECAM51 = (ReadfirmwareversionECAM51_t)GetProcAddress(hinstLibExt, "GetFirmwareVersionECAM51A");
+				initextensionunitExt = (InitextensionunitExt_t)GetProcAddress(hinstLibExt, "InitExtensionUniteCAM51A");
+				deinitextensionunit = (Deinitextensionunit_t)GetProcAddress(hinstLibExt, "DeinitExtUnit");
+			}
+			else if ((vid == "2560") && (pid == "c05c")) // eCAM51b
+			{
+				readfirmwareversionECAM51 = (ReadfirmwareversionECAM51_t)GetProcAddress(hinstLibExt, "GetFirmwareVersionECAM51B");
+				initextensionunitExt = (InitextensionunitExt_t)GetProcAddress(hinstLibExt, "InitExtensionUniteCAM51B");
+				deinitextensionunit = (Deinitextensionunit_t)GetProcAddress(hinstLibExt, "DeinitExtUnit");
+			}
+			else if ((vid == "2560") && (pid == "c181")) // eCAM82
+			{
+				readfirmwareversion82USB = (Readfirmwareversion82USB_t)GetProcAddress(hinstLibExt, "GetFirmwareVersioneCAM82");
+				initextensionunitExt = (InitextensionunitExt_t)GetProcAddress(hinstLibExt, "InitExtensionUnitECAM82");
+				deinitextensionunit = (Deinitextensionunit_t)GetProcAddress(hinstLibExt, "DeinitExtUnit");
+			}
+			else if ((vid == "2560") && (pid == "c184")) // eCAM83
+			{
+				readfirmwareversion83USB = (Readfirmwareversion83USB_t)GetProcAddress(hinstLibExt, "GetFirmwareVersioneCAM83");
+				initextensionunitExt = (InitextensionunitExt_t)GetProcAddress(hinstLibExt, "InitExtensionUnitECAM83");
+				deinitextensionunit = (Deinitextensionunit_t)GetProcAddress(hinstLibExt, "DeinitExtUnit");
+			}			
 		}
 
+#endif
+
 		if (cap.isOpened())
+		{
 			cap.release();
+		}
 
 #ifdef __linux__
 		struct udev *udev;
@@ -1143,27 +1556,41 @@ bool listDevices()
 			}
 		}
 
-        if(pid == "c188")
+		if (pid == "c188")
 		{
-			if(width == 4440 && height == 2160)
-		    {
-			    cap.set(CAP_PROP_CONVERT_RGB, false);
+			if (width == 4440 && height == 2160)
+			{
+				cap.set(CAP_PROP_CONVERT_RGB, false);
 			}
 			else
 			{
 				cap.set(CAP_PROP_CONVERT_RGB, false);
 			}
 		}
-		else if ((vid == "2560") && (pid == "c140")  || (pid == "c152") || (pid == "0121") || (pid == "c113") || (pid == "c111") || (pid == "c155") || (pid == "c124") || (pid == "c1d8" || pid == "c1d7" || pid == "c0d7"))
+		else if ((vid == "2560") && (pid == "c140") || (pid == "c152") || (pid == "0121") || (pid == "c113") || (pid == "c111") || (pid == "c155") || (pid == "c124") || (pid == "c1d8" || pid == "c1d7" || pid == "c0d7"))
 		{
-			cap.set(CAP_PROP_CONVERT_RGB, false);
+			cap.set(CAP_PROP_CONVERT_RGB/*CV_CAP_PROP_CONVERT_RGB*/, false);
 		}
 
 #ifdef _WIN32
 
 		tDevicePath = new TCHAR[devicePath.size() + 1];
 		copy(devicePath.begin(), devicePath.end(), tDevicePath);
-		bOpenHID = initextensionunit(tDevicePath);
+		if (IsExtDevice) 
+		{
+			deinitextensionunit(handle);
+			bOpenHID = initextensionunitExt(&handle , tDevicePath);
+		}
+		else
+		{
+			deinitextensionunit(handle);
+			bOpenHID = initextensionunit(tDevicePath, &handle);
+		}
+
+		if (!bOpenHID || handle == nullptr) 
+		{
+			cout << "\n\tThis camera doesnt support extension unit HID." << endl;
+		}
 
 #elif __linux__
 		bool isHidAvailable = false;
@@ -1240,6 +1667,7 @@ bool listDevices()
 
 
 //Configuring Camera Format/Resolution
+//
 bool configFormats()
 {
 	while ((dilemma == 'y') || (dilemma == 'Y'))
@@ -1284,7 +1712,14 @@ bool configFormats()
 		case EXIT:
 #ifdef _WIN32
 			bPreviewSet(1, false);
-			if (deinitextensionunit())
+			if (handle != NULL) {
+				if (deinitextensionunit(handle))
+				{
+
+				}
+				handle = nullptr;
+			}
+			if(t.joinable())
 				t.detach();
 			bSwitch = true;
 			if (cap.isOpened())
@@ -1328,8 +1763,10 @@ bool configFormats()
 			{
 				cout << "\n\t **** The Current set Format type = " << formatType << " Width = " << width << " Height = " << height << " FPS = " << fps << " ****\n\n";
 			}
-
-			if ((_CU55M || _50CUG_M))
+			else {
+				cout << "\n Not Printed";
+			}
+			if ((_CU55M || _50CUG_M || _37CUG || _512M))
 				PixelBuff = new uchar[width * height];
 
 			bReadSet(1, true);
@@ -1353,9 +1790,14 @@ bool configFormats()
 			else
 				Y12Format = false;
 
-			if (formatType == "Y16 "){
+			if (formatType == "Y16 ")
+			{
+				cout << "\nY16True";
 				Y16Format = true;
-			}else{
+			}
+			else
+			{
+				cout << "\nY16False";
 				Y16Format = false;
 			}
 #endif
@@ -1526,8 +1968,11 @@ bool configUVCSettings()
 		case EXIT:
 #ifdef _WIN32
 
-			if (deinitextensionunit())
+			if (deinitextensionunit(handle))
+			{
+				handle = nullptr;
 				t.detach();
+			}
 			bSwitch = true;
 			if (cap.isOpened())
 				cap.release();
@@ -1626,33 +2071,56 @@ bool captureStill()
 
 			bPreviewSet(1, false);
 			cap.set(CAP_PROP_CONVERT_RGB, false);
-			num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+			//num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 			goto CAPTURE;
 		case 2:
 			IsRAWSelected = false;
-			num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+			//num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 			goto CAPTURE;
 		}
 	}
 
-	if (((_CU55M || _50CUG_M) && Y12Format) || ((_CU135 || _20CUG) && Y16Format))
+CAPTURE:
+
+	if (((_CU55M || _50CUG_M || _37CUG || _512M) && Y12Format) || ((_CU135 || _20CUG || _16CUG) && Y16Format) || (Y10Format))
 	{
-		num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		if (IsRAWSelected == true)
+		{
+			num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		}
+		else if((IsRAWSelected == false) && Y16Format)
+		{
+			num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		}
 	}
 	else if (_CU40)
 	{
 		num = sprintf_s(buf, "OpenCVCamBGR_%dx%d_%d%d%d%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 		num = sprintf_s(buf1, "OpenCVCamIR_%dx%d_%d%d%d%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 	}
-	else if ((_CU83 && Y16Format && Frame.cols == 4440 && Frame.rows == 2160) || _27CUG)
+	else if ((_CU83 && Y16Format && Frame.cols == 4440 && Frame.rows == 2160) 
+				|| (_CU83 && Y16Format && Frame.cols == 3120 && Frame.rows == 1080)
+				|| _27CUG 
+				|| (_CU83_H03R1 && Y16Format && Frame.cols == 4440 && Frame.rows == 2160)
+				|| (_CU83_H03R1 && Y16Format && Frame.cols == 3120 && Frame.rows == 1080))
 	{
 		num = sprintf_s(buf, "OpenCVCamBGR_%dx%d_%d%d%d%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 		num = sprintf_s(buf1, "OpenCVCamIR_%dx%d_%d%d%d%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 	}
 	else
-		num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	{
+		if (IsRAWSelected == true) 
+		{
+			num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		}
+		else
+		{
+			num = sprintf_s(buf, "OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", curWidth, curHeight, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+		}
+	}
 
 #elif __linux__
 
@@ -1702,26 +2170,30 @@ bool captureStill()
 		}
 	}
 
+CAPTURE:
+
 	if (_CU40)
 	{
 		sprintf(buf, "%s/OpenCVCamBGR_%dx%d_%d%d%d_%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 		sprintf(buf1, "%s/OpenCVCamIR_%dx%d_%d%d%d%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
-	else if (((_CU55M || _50CUG_M) && Y12Format) || ((_CU135 || _20CUG) && Y16Format)) {
+	else if (((_CU55M || _50CUG_M || _37CUG || _512M) && Y12Format) || ((_CU135 || _20CUG || _16CUG) && Y16Format) || (Y10Format)) {
 		sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.raw", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
-	else if ((_CU83 && Y16Format && Frame.cols == 4440 && Frame.rows == 2160) || _27CUG)
+	else if ((_CU83 && Y16Format && Frame.cols == 4440 && Frame.rows == 2160)
+		|| (_CU83 && Y16Format && Frame.cols == 3120 && Frame.rows == 1080)
+		|| _27CUG
+		|| (_CU83_H03R1 && Y16Format && Frame.cols == 4440 && Frame.rows == 2160)
+		|| (_CU83_H03R1 && Y16Format && Frame.cols == 3120 && Frame.rows == 1080))
 	{
 		num = sprintf(buf, "OpenCVCamBGR_%dx%d_%d%d%d%d%d%d.jpeg", curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 		num = sprintf(buf1, "OpenCVCamIR_%dx%d_%d%d%d%d%d%d.raw", curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
-	else
+	else 
 		sprintf(buf, "%s/OpenCVCam_%dx%d_%d%d%d_%d%d%d.jpeg", cwd, curWidth, curHeight, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
 
 #endif
-
-CAPTURE:
 
 	// commented by Rishap
 //#ifdef __linux__
@@ -1735,13 +2207,28 @@ CAPTURE:
 		{
 			//Changed TRUE & FALSE to true & false respectively - commented by Sushanth
 			//Reason - compatible for both linux & windows
-			if (IsRAWSelected || (_CU83 == true && Y16Format == false))
+			if (IsRAWSelected)
 			{
-				SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows * 2));
+				if(_CU83 == true && formatType.substr(0, 4) == "UYVY")
+				{
+					SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows * 2));
+				}
+				else if((_CU83 == true && formatType.substr(0, 2) == "Y8"))
+				{
+					SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows));
+				}
+				else if (formatType.substr(0, 2) == "Y8")
+				{
+					SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows));
+				}
+				else
+				{
+					SaveInRAW(stillFrame.data, buf, (stillFrame.cols * stillFrame.rows * 2));
+				}
 #ifdef __linux__
-			    if ((_CU135 || _20CUG) && Y16Format)
+				if (((_CU135 || _20CUG || _16CUG) && Y16Format) || (Y10Format))
 					cap.set(CAP_PROP_CONVERT_RGB, false);
-				else if (_27CUG || _CU83)
+				else if (_27CUG || _CU83 || _CU83_H03R1)
 					cap.set(CAP_PROP_CONVERT_RGB, false);
 				else
 					cap.set(CAP_PROP_CONVERT_RGB, true);
@@ -1776,13 +2263,13 @@ CAPTURE:
 					imwrite(buf1, IRImage);
 					cout << endl << '\t' << buf1 << " image is saved " << endl;
 				}
-				else if (_CU83 && Y16Cu83Format)
+				else if (_CU83 && Y16Format || _CU83_H03R1 && Y16Format)
 				{
 					if (stillFrame.cols == 4440 && stillFrame.rows == 2160)
 					{
 						RGBStillImageCU83 = Mat(2160, 3840, CV_8UC2); //allocation
 						IRStillImageCU83 = Mat(675, 1920, CV_8UC2);
-						if(!stillFrame.empty())
+						if (!stillFrame.empty())
 							SeparatingRGBIRBufferStillCapture(stillFrame, &IRStillImageCU83, &RGBStillImageCU83, &RGBStillBufferSizeCU83, &IRStillBufferSizeCU83);
 
 						if (!RGBStillImageCU83.empty())
@@ -1799,13 +2286,33 @@ CAPTURE:
 						}
 
 					}
+					else if ((stillFrame.cols == 3120 && stillFrame.rows == 1080))
+					{
+						RGBStillImageCU83 = Mat(1080, 1920, CV_8UC2); //allocation
+						IRStillImageCU83 = Mat(675, 1920, CV_8UC2);
+						if (!stillFrame.empty())
+							SeparatingRGBIRBufferStillCapture(stillFrame, &IRStillImageCU83, &RGBStillImageCU83, &RGBStillBufferSizeCU83, &IRStillBufferSizeCU83);
+
+						if (!RGBStillImageCU83.empty())
+						{
+							cvtColor(RGBStillImageCU83, ResultImage, COLOR_YUV2BGR_UYVY);
+							imwrite(buf, ResultImage);
+						}
+						if (!IRStillImageCU83.empty())
+						{
+							Mat m_RAW10BitDataOutputBuffer = Mat(1080, 1920, CV_8UC2);
+							RAW10ConversionStillCU83(IRStillImageCU83.data, &m_RAW10BitDataOutputBuffer, IRStillBufferSizeCU83);
+							SaveInRAW(m_RAW10BitDataOutputBuffer.data, buf1, IRStillBufferSizeCU83);
+							cout << endl << '\t' << buf1 << " image is saved " << endl << endl;
+						}
+					}
 					else
 					{
 						if (stillFrame.cols == 3840 && stillFrame.rows == 1350)
 						{
 							int modifiedCols = 2160;
-							int size = ( stillFrame.cols * modifiedCols * stillFrame.channels());
-							if(IRImageCU83.empty())
+							int size = (stillFrame.cols * modifiedCols * stillFrame.channels());
+							if (IRImageCU83.empty())
 								IRImageCU83 = Mat(2160, 3840, CV_8UC1);
 							ConvertRAW10toRAW8(stillFrame, IRImageCU83);
 
@@ -1831,7 +2338,7 @@ CAPTURE:
 					}
 
 				}
-				else if ((_CU55M || _50CUG_M) && Y12Format)
+				else if ((_CU55M || _50CUG_M || _37CUG || _512M) && Y12Format)
 				{
 					StillBuff = new uchar[stillFrame.cols * stillFrame.rows * 2];
 					ConvertY12forStill(stillFrame, StillBuff);
@@ -1841,13 +2348,18 @@ CAPTURE:
 				{
 					cvtColor(stillFrame, RsltFrame, COLOR_YUV2BGR_UYVY);
 					imwrite(buf, RsltFrame);
-					SaveInRAW(stillFrame.data, buf1, Frame.rows*Frame.cols*2);
+					SaveInRAW(stillFrame.data, buf1, Frame.rows*Frame.cols * 2);
 					cout << endl << '\t' << buf1 << " image is saved " << endl << endl;
 				}
-				else if ((_CU135 || _20CUG) && Y16Format)
+				else if (((_CU135 || _20CUG || _16CUG) && Y16Format) || (Y10Format))
 				{
 					convertScaleAbs(stillFrame, ResultImage, 0.2490234375);
-					imwrite(buf, ResultImage);
+					
+					if (IsRAWSelected || Y10Format)
+						SaveInRAW(stillFrame.data, buf, (Frame.rows*Frame.cols * 2));
+					else
+						imwrite(buf, ResultImage);
+					
 				}
 #ifdef _WIN32
 				else if (formatType.substr(0, 4) == "YUY2") {
@@ -1873,6 +2385,7 @@ CAPTURE:
 
 			}
 			bReadSet(1, true);
+			bPreviewSet(1, true);
 			cout << endl << '\t' << buf << " image is saved " << endl << endl;
 		}
 	}
@@ -1956,21 +2469,127 @@ bool configExtUVCSettings()
 
 #elif _WIN32
 
-	UINT8 pMajorVersion = 0;
-	UINT8 pMinorVersion1 = 0;
-	UINT16 pMinorVersion2 = 0;
-	UINT16 pMinorVersion3 = 0;
+	uint8_t pMajorVersion = 0;
+	uint8_t pMinorVersion1 = 0;
+	uint16_t pMinorVersion2 = 0;
+	uint16_t pMinorVersion3 = 0;
 
-	BOOL result = readfirmwareversion(&pMajorVersion, &pMinorVersion1, &pMinorVersion2, &pMinorVersion3);
-	if (!result)
+	if (!IsExtDevice)
 	{
-		cout << endl << "Reading Data from the UVC Extension is Failed" << endl;
-		return false;
+		BOOL result = readfirmwareversion(handle, &pMajorVersion, &pMinorVersion1, &pMinorVersion2, &pMinorVersion3);
+		if (!result)
+		{
+			cout << endl << "Reading Data from the UVC Extension is Failed" << endl;
+			return false;
+		}
+		printf("\nFirmWareVersion Number = %d.%d.%d.%d \n\n", pMajorVersion, pMinorVersion1, pMinorVersion2, pMinorVersion3);
+	}
+	else
+	{
+		if ((vid == "2560") && (pid == "0035")) // tania
+		{ 
+			CHAR g_pValue[41]; // Buffer to hold firmware version data
+			CHAR Buffer[41];   // Buffer for formatted output
+			BOOL result = readfirmwareversionTANIA(handle, g_pValue);
+
+			if (!result) {
+				cout << endl << "Reading Data from the UVC Extension is Failed" << endl;
+				return false;
+			}
+
+			// Clear the Buffer to avoid garbage data
+			memset(Buffer, 0x00, sizeof(Buffer));
+
+			// Format the firmware version from g_pValue
+			StringCbPrintfA(Buffer, sizeof(Buffer), "0x%x.0x%x (%d.%d)", g_pValue[27], g_pValue[28], g_pValue[27], g_pValue[28]);
+
+			// Print the formatted firmware version
+			printf("\nFirmware Version (TANIA) = %s\n", Buffer);
+		}
+		else if ((vid == "2560") && (pid == "0102" || pid == "c123" || pid == "c129")) // eCAM22
+		{
+			uint8_t uFirmwareValue[4]; // Buffer to hold firmware version values
+			BOOL result = readfirmwareversionECAM22(handle, 0x07, uFirmwareValue);
+
+			if (!result) {
+				cout << endl << "Failed to read firmware version for eCAM22." << endl;
+				return false;
+			}
+
+			// Format firmware version message
+			WCHAR firmwareMessage[MAX_PATH];
+			StringCchPrintf(firmwareMessage, MAX_PATH, L"Firmware Version: %d.%d.%d.%d",
+				uFirmwareValue[0], uFirmwareValue[1], uFirmwareValue[2], uFirmwareValue[3]);
+
+			// Print firmware version to console
+			wprintf(L"\nFirmware Version (eCAM22) = %s\n", firmwareMessage);
+		}
+		else if ((vid == "2560") && (pid == "c05a" || pid == "c05c")) // eCAM51A and eCAM51B
+		{
+			uint8_t uFirmwareValue[4]; // Buffer to hold firmware version values
+			BOOL result = readfirmwareversionECAM51(handle, uFirmwareValue);
+
+			if (!result) {
+				cout << endl << "Failed to read firmware version for eCAM51A." << endl;
+				return false;
+			}
+
+			// Format firmware version message
+			WCHAR firmwareMessage[MAX_PATH];
+			StringCchPrintf(firmwareMessage, MAX_PATH, L"Firmware Version: 20%d.%d.%d Ver %d",
+				uFirmwareValue[0], uFirmwareValue[1], uFirmwareValue[2], uFirmwareValue[3]);
+
+			// Print the firmware version to the console
+			wprintf(L"\nFirmware Version (eCAM51A) = %s\n", firmwareMessage);
+		}	
+		else if ((vid == "2560") && (pid == "c181")) // eCAM82
+		{
+			uint8_t FirmwareVersion1 = 0;
+			uint8_t FirmwareVersion2 = 0;
+			uint16_t FirmwareVersion3 = 0;
+
+			BOOL result = readfirmwareversion82USB(handle, &FirmwareVersion1, &FirmwareVersion2, &FirmwareVersion3);
+
+			if (!result) {
+				cout << endl << "Failed to read firmware version for eCAM82." << endl;
+				return false;
+			}
+
+			// Format firmware version message
+			WCHAR firmwareMessage[MAX_PATH];
+			StringCchPrintf(firmwareMessage, MAX_PATH, L"Firmware Version: %d.%d.%d",
+				FirmwareVersion1, FirmwareVersion2, FirmwareVersion3);
+
+			// Print the firmware version to the console
+			wprintf(L"\nFirmware Version (eCAM82) = %s\n", firmwareMessage);
+		}
+		else if ((vid == "2560") && (pid == "c184")) // eCAM83
+		{
+			uint8_t MajorVersion = 0;
+			uint8_t MinorVersion = 0;
+			uint16_t MinorVersion1 = 0;
+			uint32_t CommitId = 0;
+
+			BOOL result = readfirmwareversion83USB(handle, &MajorVersion, &MinorVersion, &MinorVersion1, &CommitId);
+
+			if (!result) {
+				cout << endl << "Failed to read firmware version for eCAM83." << endl;
+				return false;
+			}
+
+			// Format firmware version message
+			WCHAR firmwareMessage[MAX_PATH * 2];
+			StringCbPrintf(firmwareMessage, sizeof(firmwareMessage), L"Firmware Version: %d.%d.%d.%x",
+				MajorVersion, MinorVersion, MinorVersion1, CommitId);
+
+			// Print the firmware version to the console
+			wprintf(L"\nFirmware Version (eCAM83) = %s\n", firmwareMessage);
+		}
+
 	}
 
 #endif
 
-	printf("\nFirmWareVersion Number = %d.%d.%d.%d \n\n", pMajorVersion, pMinorVersion1, pMinorVersion2, pMinorVersion3);
 
 	return true;
 }
@@ -2002,8 +2621,11 @@ bool hidProp()
 		case EXIT:
 #ifdef _WIN32
 
-			if (deinitextensionunit())
+			if (deinitextensionunit(handle))
+			{
+				handle = nullptr;
 				t.detach();
+			}
 			bSwitch = true;
 			if (cap.isOpened())
 				cap.release();
@@ -2052,7 +2674,7 @@ bool exploreCam()
 		cout << '\t' << "3 - Configure UVC Settings" << endl;
 		cout << '\t' << "4 - Capture Still Images" << endl;
 
-		if (bOpenHID)
+		if (bOpenHID == 1)
 		{
 			cout << '\t' << "5 - HID Properties" << endl;
 			while ((choice < 0) || (choice > 5))
@@ -2079,13 +2701,29 @@ bool exploreCam()
 		switch (choice)
 		{
 		case EXIT:
+		{
 #ifdef _WIN32
+			{
+				if (handle != NULL)
+				{
+					if (deinitextensionunit(handle))
+					{
+					}
 
-			if (deinitextensionunit())
-				t.detach();
-			bSwitch = true;
-			if (cap.isOpened())
-				cap.release();
+					handle = nullptr;
+				}
+
+				if (t.joinable())
+				{
+					t.detach();
+				}
+
+				//t.detach();
+				bSwitch = true;
+				if (cap.isOpened())
+				{
+					cap.release();
+				}
 
 #elif __linux__
 
@@ -2096,8 +2734,14 @@ bool exploreCam()
 #endif
 
 			exit(0);
-
+			}
+		}
 		case 1:
+		{
+			bPreviewSet(1, false);
+			handle = nullptr;
+			
+			cameraswitch = true;
 			if (!listDevices())
 			{
 				cout << endl << "List Devices Information failed" << endl;
@@ -2105,7 +2749,7 @@ bool exploreCam()
 			}
 			cout << endl << "Connected Devices were Listed" << endl;
 			break;
-
+		}
 		case 2:
 			if (!configFormats())
 			{
@@ -2116,6 +2760,7 @@ bool exploreCam()
 			break;
 
 		case 3:
+			/** cout<<"\n configUVCSettings"; **/
 			if (!configUVCSettings())
 			{
 				cout << endl << "UVC Settings Configuration is Failed" << endl;

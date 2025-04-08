@@ -53,7 +53,7 @@ namespace {
 /** Ordering guidelines:
 - modern optimized, multi-platform libraries: ffmpeg, gstreamer, Media SDK
 - platform specific universal SDK: WINRT, AVFOUNDATION, MSMF/DSHOW, V4L/V4L2
-- RGB-D: OpenNI/OpenNI2, REALSENSE, OBSENSOR
+- RGB-D: OpenNI/OpenNI2, REALSENSE
 - special OpenCV (file-based): "images", "mjpeg"
 - special camera SDKs, including stereo: other special SDKs: FIREWIRE/1394, XIMEA/ARAVIS/GIGANETIX/PVAPI(GigE)/uEye
 - other: XINE, gphoto2, etc
@@ -149,7 +149,7 @@ static const struct VideoBackendInfo builtin_backends[] =
 #if defined(HAVE_ANDROID_MEDIANDK) || defined(HAVE_ANDROID_NATIVE_CAMERA)
     DECLARE_STATIC_BACKEND(CAP_ANDROID, "ANDROID_NATIVE",
 #ifdef HAVE_ANDROID_MEDIANDK
-                           MODE_CAPTURE_BY_FILENAME | MODE_WRITER
+                           MODE_CAPTURE_BY_FILENAME
 #else
                            0
 #endif
@@ -169,17 +169,8 @@ static const struct VideoBackendInfo builtin_backends[] =
 #else
                            0,
 #endif
-#ifdef HAVE_ANDROID_MEDIANDK
-                           createAndroidVideoWriter)
-#else
                            0)
 #endif
-#endif
-
-#ifdef HAVE_OBSENSOR
-    DECLARE_STATIC_BACKEND(CAP_OBSENSOR, "OBSENSOR", MODE_CAPTURE_BY_INDEX, 0, create_obsensor_capture, 0)
-#endif
-
     // dropped backends: MIL, TYZX
 };
 
@@ -204,6 +195,7 @@ protected:
             info.priority = 1000 - i * 10;
         }
         CV_LOG_DEBUG(NULL, "VIDEOIO: Builtin backends(" << N << "): " << dumpBackends());
+
         if (readPrioritySettings())
         {
             CV_LOG_INFO(NULL, "VIDEOIO: Updated backends priorities: " << dumpBackends());

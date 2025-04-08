@@ -68,6 +68,7 @@ class Format:
         format_type, width, height, fps = self.get_current_format()
         print(f"\tCurrent Format={format_type},Width={width},Height={height},FPS={fps}")
         ret, total_formats = self.cap.getFormats()
+        print("\nTotal formats is :",total_formats)
         if not ret:
             return False
         print("\t0.EXIT\n\t1.BACK")

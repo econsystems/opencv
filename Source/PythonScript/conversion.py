@@ -18,13 +18,14 @@ class Conversion:
 
     V4L2_PIX_FMT_Y16 = "Y16 "
     V4L2_PIX_FMT_Y12 = "Y12 "
-    V4L2_PIX_FMT_Y8 = "Y8  "
+    V4L2_PIX_FMT_Y8  = "Y8  "
+    V4L2_PIX_FMT_Y10 = "Y10 "
     format_type = 0
 
     y16CameraFlag = -1  # flag which denotes type of y16 camera.
     y8_frame = None
-    IRRGBCameraFlag27CUG = "UYVY";
-    UYVYCameraFlagCU83 = "UYVY";
+    IRRGBCameraFlag27CUG = "UYVY"
+    UYVYCameraFlagCU83 = "UYVY"
 
     @classmethod
     def init_conversion(cls, current_format, device_name):
@@ -37,7 +38,6 @@ class Conversion:
         :param device_name: Name of the selected device
         :type device_name:  str
         '''
-        # print("device name:", device_name)
         cls.format_type, width, height, fps = current_format
         if cls.format_type == cls.V4L2_PIX_FMT_Y16:
             if device_name.find("See3CAM_20CUG") > -1  or device_name.find("See3CAM_CU135MH") > -1 or device_name.find("See3CAM_CU135M_H03R1") > -1:
@@ -45,6 +45,8 @@ class Conversion:
             elif device_name.find("See3CAM_CU40") > -1:
                 cls.y16CameraFlag = cls.SEE3CAM_CU40
             elif device_name.find("See3CAM_CU83") > -1:
+                cls.y16CameraFlag = cls.SEE3CAM_CU83
+            elif device_name.find("See3CAM_CU83_H03R1") > -1:
                 cls.y16CameraFlag = cls.SEE3CAM_CU83
             else:
                 cls.y16CameraFlag = cls.OTHER_Y16CAMERAS
@@ -56,7 +58,6 @@ class Conversion:
                 cls.y16CameraFlag = cls.SEE3CAM_CU83
 
         elif cls.format_type == cls.V4L2_PIX_FMT_Y8:
-            # print("inside Y8")
             if device_name.find("See3CAM_CU83") > -1:
                 cls.y16CameraFlag = cls.SEE3CAM_CU83
                 
@@ -85,9 +86,9 @@ class Conversion:
         convert_func = {
             "Y12 ": cls.convert_y12_to_y8,
             "Y16 ": cls.convert_y16_to_rgb,
+            "Y10 ": cls.convert_y16_to_rgb,
         }
 
-        # print("convert_frame convert_y16_to_rgb")
         func = convert_func.get(frame_format, lambda: "Invalid Selection")
         return func(frame)
 
@@ -126,14 +127,11 @@ class Conversion:
         :rtype: Mat
         '''
         if cls.y16CameraFlag == cls.SEE3CAM_20CUG:
-            print("SEE3CAM_20CUG")
             return cv2.convertScaleAbs(frame, 0.2490234375)
         elif cls.y16CameraFlag == cls.SEE3CAM_CU40:
             return cls.convert_RGIR_to_RGGB(frame)
-            print("SEE3CAM_CU40")
         elif cls.y16CameraFlag == cls.OTHER_Y16CAMERAS:
             return cv2.convertScaleAbs(frame, 0.06226)
-        # print("others")
         return cv2.convertScaleAbs(frame, 0.2490234375)
     @staticmethod
     def convert_y12_for_still(frame):
@@ -193,46 +191,76 @@ class Conversion:
         rgb_frame = cv2.cvtColor(bayer_RGGB, cv2.COLOR_BayerRG2BGR)
         return rgb_frame, ir_frame
     
+
+    @staticmethod
+    def Check_RGB_Frame(frame):
+        raw_bytes = frame.tobytes()
+        if(raw_bytes[7] == 0):
+            return frame
+    
     @staticmethod
     def SeparatingRGBIRBuffers(frame , frame_format):
-        '''
-        Method Name: SeparatingRGBIRBuffers
-        Description: This method does the separation of RGB and IR Frames in separate buffers.
-        :param frame: frame which needs to be separated
-        :type frame: Mat
-        :return: The separated RGB frame
-        :rtype: rgb frame and IR frame
-        '''
-    
         RGBIRBuff = np.frombuffer(frame.tobytes(), dtype=np.uint8)
         rows , cols = frame.shape
+        if (rows == 2160 and cols == 4440):
+            size = rows * cols * 2
+
+            Buffcnt = 0
+            RGBBufSize = 0
+            IRBufSize = 0
+
+            RGBframe = np.zeros((2160*3840*2), dtype=np.uint8)
+            IRframe = np.zeros((1080*1920), dtype=np.uint8)
+            IRBuffLength = size - RGBframe.size
+            IRBuff = np.zeros(IRBuffLength, dtype=np.uint8)
+            while size > 0:
+                lsb = RGBIRBuff[Buffcnt] & 0x03
+                if lsb == 0:   
+                    RGBframe[RGBBufSize:RGBBufSize +7679] = RGBIRBuff[Buffcnt:Buffcnt+7679]
+                    Buffcnt += 7680
+                    RGBBufSize += 7680
+                    size -= 7680
+                elif lsb == 0x03:
+                    IRBuff[IRBufSize:(IRBufSize+2399)] = RGBIRBuff[Buffcnt:(Buffcnt+2399)]
+                    IRBufSize += 2400
+                    Buffcnt += 2400
+                    size -= 2400
+                else:
+                    return None , None
+            
+            IRframe[0:IRframe.size] = IRBuff[np.mod(np.arange(1, IRBuffLength + 1), 5) != 0]
+            IRframe = IRframe.reshape(1080,1920)
+            RGBframe = RGBframe.reshape(2160, 3840, 2)
+            return RGBframe , IRframe
+
         size = rows * cols * 2
+        
         Buffcnt = 0
         RGBBufSize = 0
         IRBufSize = 0
-        RGBframe = np.zeros((2160, 3840 , 2), dtype=np.uint8)
 
-        IRframe = np.zeros((1080, 1920), dtype=np.uint8)
-        IRBuff = bytearray(1920 * 1080 * 2)
+        RGBframe = np.zeros((1080*1920*2), dtype=np.uint8)
+        IRframe = np.zeros((1080*1920), dtype=np.uint8)
+        IRBuffLength = size - RGBframe.size
+        IRBuff = np.zeros(IRBuffLength, dtype=np.uint8)
         while size > 0:
-            lsb = RGBIRBuff[Buffcnt] & 0x01
-            if lsb == 0:              
-                RGBframe.flat[RGBBufSize:RGBBufSize +7679] = RGBIRBuff[Buffcnt:Buffcnt+7679]
-                Buffcnt += 7680
-                RGBBufSize += 7680
-                size -= 7680
-            else:
-                IRBuff[IRBufSize:(IRBufSize+2399)] = RGBIRBuff[Buffcnt:(Buffcnt+2399)].tobytes()
+            lsb = RGBIRBuff[Buffcnt] & 0x03
+            if lsb == 0:  
+                RGBframe[RGBBufSize:RGBBufSize +3839] = RGBIRBuff[Buffcnt:Buffcnt+3839]
+                Buffcnt += 3840
+                RGBBufSize += 3840
+                size -= 3840
+            elif lsb == 0x03:
+                IRBuff[IRBufSize:(IRBufSize+2399)] = RGBIRBuff[Buffcnt:(Buffcnt+2399)]
                 IRBufSize += 2400
                 Buffcnt += 2400
                 size -= 2400
-        bufsize_IR = 0
-        Buffcnt = 0
-        while IRBufSize > 0:
-            IRframe.flat[bufsize_IR:bufsize_IR +4] = IRBuff[Buffcnt:(Buffcnt+4)]
-            bufsize_IR += 4
-            Buffcnt += 5
-            IRBufSize -= 5
+            else:
+                return None , None
+            
+        IRframe[0:IRframe.size] = IRBuff[np.mod(np.arange(1, IRBuffLength + 1), 5) != 0]
+        IRframe = IRframe.reshape(1080, 1920)
+        RGBframe = RGBframe.reshape(1080, 1920, 2)
         return RGBframe , IRframe
   
     @staticmethod

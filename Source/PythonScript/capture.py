@@ -33,20 +33,15 @@ class Capture:
         if not (np.sum(frame) == None):
             if Conversion.IRRGBCameraFlag27CUG != Conversion.SEE3CAM_27CUG:                  
                 Capture.capture_flag = False
-            # elif Conversion.y16CameraFlag != Conversion.SEE3CAM_CU83:
-            #     Capture.capture_flag = False
             else:
                 if Conversion.IRRGBCameraFlag27CUG == Conversion.SEE3CAM_27CUG:
 
                     raw_bytes = frame.tobytes()
                     if Capture.RGBFrameCaptured == False and raw_bytes[7] == 0x00:
-                        print("inside rgbframe")
                         Capture.RGBFrameCaptured = True 
                     elif Capture.IRFrameCaptured == False and raw_bytes[7] == 0x01:
-                        print("inside irframe")
                         Capture.IRFrameCaptured = True  
                     elif Capture.IRFrameCaptured == True and Capture.RGBFrameCaptured == True:
-                        print("inside both")
                         print("\n Image Saved")
                         Capture.capture_flag = False
                         Capture.RGBFrameCaptured = False
@@ -59,7 +54,7 @@ class Capture:
                         return True
 
             if Capture.convert_to_RAW_Selected:
-                # print("\n Raw Frame")
+                
                 if not (frame_format == "UYVY") | (frame_format == "YUY2") | (frame_format == "Y8  ") | (frame_format == "Y16 "):
                     display.Display:stop_display()
                     cap.set(cv2.CAP_PROP_CONVERT_RGB, 1)
@@ -69,7 +64,6 @@ class Capture:
                 Capture.capture_thread = threading.Thread(target=Capture.convert_image, args=(frame, frame_format,),
                                                             daemon=True)
                 Capture.capture_thread.start()
-            #Capture.convert_image(frame, frame_format)
             return True
             
 
@@ -81,7 +75,6 @@ class Capture:
         :param frame: The frame which needs to be converted
         :param frame_format: The format of the frame. for ex: YUYV, MJPG, etc
         '''
-        # print(Capture.convert_to_RAW_Selected)
         if frame_format == "Y8  ":
            if Conversion.y16CameraFlag == Conversion.SEE3CAM_CU83:
                if Capture.convert_to_RAW_Selected:     
@@ -91,13 +84,18 @@ class Capture:
                    Capture.save_image(frame, frame_format, frame.shape[0], frame.shape[1], image_format='.jpg')
            else:
                image = frame.data
-               Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
+               if Capture.convert_to_RAW_Selected:                  
+                    Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
+                    Capture.convert_to_RAW_Selected = False
+               else:
+                   Capture.save_image(frame, frame_format, frame.shape[0], frame.shape[1], image_format='.jpg')
+                   
                
         elif Capture.convert_to_RAW_Selected:
-
+            print("\n Convert to RAW Selected ")
             if frame_format == Conversion.V4L2_PIX_FMT_Y16 and Conversion.y16CameraFlag == Conversion.SEE3CAM_CU83:
                         rows,cols = frame.shape
-                        if rows == 2160 and cols == 4440:
+                        if (rows == 2160 and cols == 4440) or (rows == 1080 and cols == 3120):
                             Capture.RGBIRFrameCaptured = True 
                             rgbframe , irframe = Conversion.SeparatingRGBIRBuffers(frame,frame_format)
                             new_frame = cv2.cvtColor(rgbframe, cv2.COLOR_YUV2BGR_UYVY)           
@@ -112,6 +110,7 @@ class Capture:
                             Capture.save_image(IRframe, frame_format, IRframe.shape[0], IRframe.shape[1], image_format='.raw')
                             Capture.convert_to_RAW_Selected = False
             else:
+                        print("\n Convert to RAW Selected ++")
                         image = frame
                         Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
                         if Conversion.y16CameraFlag == Conversion.SEE3CAM_CU83:
@@ -125,7 +124,7 @@ class Capture:
 
             elif Conversion.y16CameraFlag == Conversion.SEE3CAM_CU83:
                 rows,cols = frame.shape
-                if rows == 2160 and cols == 4440:
+                if (rows == 2160 and cols == 4440) or (rows == 1080 and cols == 3120):
                         Capture.RGBIRFrameCaptured = True 
                         rgbframe , irframe = Conversion.SeparatingRGBIRBuffers(frame,frame_format)
                         new_frame = cv2.cvtColor(rgbframe, cv2.COLOR_YUV2BGR_UYVY)           
@@ -144,6 +143,9 @@ class Capture:
         elif frame_format == Conversion.V4L2_PIX_FMT_Y12:
             image = Conversion.convert_y12_for_still(frame)
             Capture.save_image(image, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
+        elif frame_format == Conversion.V4L2_PIX_FMT_Y10:
+            image = Conversion.convert_y16_to_rgb(frame)
+            Capture.save_image(frame, frame_format, frame.shape[0], frame.shape[1], image_format='.raw')
         else:
             if frame_format == "UYVY":
                 image = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_UYVY, 3)
@@ -168,7 +170,7 @@ class Capture:
                 or False - when image is not saved.
         '''
         time = datetime.now().strftime("%d%m%Y_%H%M%S%f")[:-3]
-        if frame_format == Conversion.V4L2_PIX_FMT_Y12 or frame_format == Conversion.V4L2_PIX_FMT_Y16:
+        if frame_format == Conversion.V4L2_PIX_FMT_Y12 or frame_format == Conversion.V4L2_PIX_FMT_Y16 or frame_format == Conversion.V4L2_PIX_FMT_Y10:
             frame_format = frame_format[:-1]  # slicing the string to remove space("Y16 ") in y12 and y16.
 
         file_name = f"{os.getcwd()}/OpenCVCam_{ir}image_{frame_format}_{height}x{width}_{time}{image_format}"

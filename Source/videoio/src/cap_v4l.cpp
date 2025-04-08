@@ -270,13 +270,6 @@ typedef uint32_t __u32;
 #define V4L2_PIX_FMT_Y12 v4l2_fourcc('Y', '1', '2', ' ')
 #endif
 
-#ifndef V4L2_PIX_FMT_ABGR32
-#define V4L2_PIX_FMT_ABGR32  v4l2_fourcc('A', 'R', '2', '4')
-#endif
-#ifndef V4L2_PIX_FMT_XBGR32
-#define V4L2_PIX_FMT_XBGR32  v4l2_fourcc('X', 'R', '2', '4')
-#endif
-
 /* Defaults - If your board can do better, set it here.  Set for the most common type inputs. */
 #define DEFAULT_V4L_WIDTH  640
 #define DEFAULT_V4L_HEIGHT 480
@@ -288,11 +281,6 @@ typedef uint32_t __u32;
 #define MAX_V4L_BUFFERS 10
 #define DEFAULT_V4L_BUFFERS 4
 #define MAX_DEVICE_DRIVER_NAME 80
-// types of memory in 'special' buffer
-enum {
-    MEMORY_ORIG = 0, // Image data in original format.
-    MEMORY_RGB  = 1, // Image data converted to RGB format.
-};
 
 // if enabled, then bad JPEG warnings become errors and cause NULL returned instead of image
 // #define V4L_ABORT_BADJPEG
@@ -325,27 +313,17 @@ static const char* decode_ioctl_code(unsigned long ioctlCode)
     return "unknown";
 }
 
-struct Memory
-{
-    void *  start;
-    size_t  length;
-
-    Memory() : start(NULL), length(0) {}
-};
-
 /* Device Capture Objects */
 /* V4L2 structure */
 struct Buffer
 {
-    Memory memories[VIDEO_MAX_PLANES];
-    v4l2_plane planes[VIDEO_MAX_PLANES] = {};
-    // Total number of bytes occupied by data in the all planes (payload)
-    __u32 bytesused;
+    void *  start;
+    size_t  length;
     // This is dequeued buffer. It used for to put it back in the queue.
     // The buffer is valid only if capture->bufferIndex >= 0
     v4l2_buffer buffer;
 
-    Buffer()
+    Buffer() : start(NULL), length(0)
     {
         buffer = v4l2_buffer();
     }
@@ -396,7 +374,6 @@ struct CvCaptureCAM_V4L CV_FINAL : public CvCapture
     v4l2_format form;
     v4l2_requestbuffers req;
     v4l2_buf_type type;
-    unsigned char num_planes;
 
     timeval timestamp;
 
@@ -460,7 +437,6 @@ CvCaptureCAM_V4L::CvCaptureCAM_V4L() :
     fps(0), convert_rgb(0), frame_allocated(false), returnFrame(false),
     channelNumber(-1), normalizePropRange(false),
     type(V4L2_BUF_TYPE_VIDEO_CAPTURE),
-    num_planes(0),
     havePendingFrame(false)
 {
     frame = cvIplImage();
@@ -503,24 +479,15 @@ bool CvCaptureCAM_V4L::isOpened() const
 bool CvCaptureCAM_V4L::try_palette_v4l2()
 {
     form = v4l2_format();
-    form.type = type;
-    if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-        form.fmt.pix_mp.pixelformat = palette;
-        form.fmt.pix_mp.field       = V4L2_FIELD_ANY;
-        form.fmt.pix_mp.width       = width;
-        form.fmt.pix_mp.height      = height;
-    } else {
-        form.fmt.pix.pixelformat = palette;
-        form.fmt.pix.field       = V4L2_FIELD_ANY;
-        form.fmt.pix.width       = width;
-        form.fmt.pix.height      = height;
-    }
+    form.type                = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    form.fmt.pix.pixelformat = palette;
+    form.fmt.pix.field       = V4L2_FIELD_ANY;
+    form.fmt.pix.width       = width;
+    form.fmt.pix.height      = height;
     if (!tryIoctl(VIDIOC_S_FMT, &form, true))
     {
         return false;
     }
-    if (V4L2_TYPE_IS_MULTIPLANAR(type))
-        return palette == form.fmt.pix_mp.pixelformat;
     return palette == form.fmt.pix.pixelformat;
 }
 
@@ -574,15 +541,12 @@ bool CvCaptureCAM_V4L::try_init_v4l2()
         return false;
     }
 
-    if ((capability.capabilities & (V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_VIDEO_CAPTURE_MPLANE)) == 0)
+    if ((capability.capabilities & V4L2_CAP_VIDEO_CAPTURE) == 0)
     {
         /* Nope. */
-        CV_LOG_INFO(NULL, "VIDEOIO(V4L2:" << deviceName << "): not supported - device is unable to capture video (missing V4L2_CAP_VIDEO_CAPTURE or V4L2_CAP_VIDEO_CAPTURE_MPLANE)");
+        CV_LOG_INFO(NULL, "VIDEOIO(V4L2:" << deviceName << "): not supported - device is unable to capture video (missing V4L2_CAP_VIDEO_CAPTURE)");
         return false;
     }
-
-    if (capability.capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE)
-        type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     return true;
 }
 
@@ -614,8 +578,6 @@ bool CvCaptureCAM_V4L::autosetup_capture_mode_v4l2()
             V4L2_PIX_FMT_NV21,
             V4L2_PIX_FMT_SBGGR8,
             V4L2_PIX_FMT_SGBRG8,
-            V4L2_PIX_FMT_XBGR32,
-            V4L2_PIX_FMT_ABGR32,
             V4L2_PIX_FMT_SN9C10X,
 #ifdef HAVE_JPEG
             V4L2_PIX_FMT_MJPEG,
@@ -647,7 +609,7 @@ bool CvCaptureCAM_V4L::setFps(int value)
         return false;
 
     v4l2_streamparm streamparm = v4l2_streamparm();
-    streamparm.type = type;
+    streamparm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     streamparm.parm.capture.timeperframe.numerator = 1;
     streamparm.parm.capture.timeperframe.denominator = __u32(value);
     if (!tryIoctl(VIDIOC_S_PARM, &streamparm) || !tryIoctl(VIDIOC_G_PARM, &streamparm))
@@ -685,8 +647,6 @@ bool CvCaptureCAM_V4L::convertableToRgb() const
     case V4L2_PIX_FMT_Y10:
     case V4L2_PIX_FMT_GREY:
     case V4L2_PIX_FMT_BGR24:
-    case V4L2_PIX_FMT_XBGR32:
-    case V4L2_PIX_FMT_ABGR32:
         return true;
     default:
         break;
@@ -696,27 +656,16 @@ bool CvCaptureCAM_V4L::convertableToRgb() const
 
 void CvCaptureCAM_V4L::v4l2_create_frame()
 {
-    CvSize size;
+    CV_Assert(form.fmt.pix.width <= (uint)std::numeric_limits<int>::max());
+    CV_Assert(form.fmt.pix.height <= (uint)std::numeric_limits<int>::max());
+    CvSize size = {(int)form.fmt.pix.width, (int)form.fmt.pix.height};
     int channels = 3;
     int depth = IPL_DEPTH_8U;
-
-
-    if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-        CV_Assert(form.fmt.pix_mp.width <= (uint)std::numeric_limits<int>::max());
-        CV_Assert(form.fmt.pix_mp.height <= (uint)std::numeric_limits<int>::max());
-        size = {(int)form.fmt.pix_mp.width, (int)form.fmt.pix_mp.height};
-    } else {
-        CV_Assert(form.fmt.pix.width <= (uint)std::numeric_limits<int>::max());
-        CV_Assert(form.fmt.pix.height <= (uint)std::numeric_limits<int>::max());
-        size = {(int)form.fmt.pix.width, (int)form.fmt.pix.height};
-    }
 
     if (!convert_rgb) {
         switch (palette) {
         case V4L2_PIX_FMT_BGR24:
         case V4L2_PIX_FMT_RGB24:
-        case V4L2_PIX_FMT_XBGR32:
-        case V4L2_PIX_FMT_ABGR32:
             break;
         case V4L2_PIX_FMT_YUYV:
         case V4L2_PIX_FMT_UYVY:
@@ -746,20 +695,15 @@ void CvCaptureCAM_V4L::v4l2_create_frame()
         default:
             channels = 1;
             if(bufferIndex < 0)
-                size = cvSize(buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].length, 1);
-            else {
-                __u32 bytesused = 0;
-                if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-                    __u32 data_offset;
-                    for (unsigned char n_planes = 0; n_planes < num_planes; n_planes++) {
-                        data_offset = buffers[bufferIndex].planes[n_planes].data_offset;
-                        bytesused += buffers[bufferIndex].planes[n_planes].bytesused - data_offset;
-                    }
-                } else
-                      bytesused = buffers[bufferIndex].buffer.bytesused;
-                size = cvSize(bytesused, 1);
-            }
+                size = cvSize(buffers[MAX_V4L_BUFFERS].length, 1);
+            else
+                size = cvSize(buffers[bufferIndex].buffer.bytesused, 1);
             break;
+        }
+    }else {
+        if(V4L2_PIX_FMT_Y10){
+            channels = 1;
+            depth = IPL_DEPTH_16U;
         }
     }
 
@@ -790,7 +734,7 @@ bool CvCaptureCAM_V4L::initCapture()
 
     /* Find Window info */
     form = v4l2_format();
-    form.type = type;
+    form.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
     if (!tryIoctl(VIDIOC_G_FMT, &form))
     {
@@ -811,27 +755,18 @@ bool CvCaptureCAM_V4L::initCapture()
     /* try to set framerate */
     setFps(fps);
 
+    unsigned int min;
+
     /* Buggy driver paranoia. */
-    if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-        // TODO: add size adjustment if needed
-    } else {
-        unsigned int min;
+    min = form.fmt.pix.width * 2;
 
-        min = form.fmt.pix.width * 2;
+    if (form.fmt.pix.bytesperline < min)
+        form.fmt.pix.bytesperline = min;
 
-        if (form.fmt.pix.bytesperline < min)
-            form.fmt.pix.bytesperline = min;
+    min = form.fmt.pix.bytesperline * form.fmt.pix.height;
 
-        min = form.fmt.pix.bytesperline * form.fmt.pix.height;
-
-        if (form.fmt.pix.sizeimage < min)
-            form.fmt.pix.sizeimage = min;
-    }
-
-    if (V4L2_TYPE_IS_MULTIPLANAR(type))
-        num_planes = form.fmt.pix_mp.num_planes;
-    else
-        num_planes = 1;
+    if (form.fmt.pix.sizeimage < min)
+        form.fmt.pix.sizeimage = min;
 
     if (!requestBuffers())
         return false;
@@ -877,7 +812,7 @@ bool CvCaptureCAM_V4L::requestBuffers(unsigned int buffer_number)
 
     req = v4l2_requestbuffers();
     req.count = buffer_number;
-    req.type = type;
+    req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     req.memory = V4L2_MEMORY_MMAP;
 
     if (!tryIoctl(VIDIOC_REQBUFS, &req)) {
@@ -901,56 +836,34 @@ bool CvCaptureCAM_V4L::createBuffers()
     size_t maxLength = 0;
     for (unsigned int n_buffers = 0; n_buffers < req.count; ++n_buffers) {
         v4l2_buffer buf = v4l2_buffer();
-        v4l2_plane mplanes[VIDEO_MAX_PLANES];
-        size_t length = 0;
-        off_t offset = 0;
-        buf.type = type;
+        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.memory = V4L2_MEMORY_MMAP;
         buf.index = n_buffers;
-        if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-            buf.m.planes = mplanes;
-            buf.length = VIDEO_MAX_PLANES;
-        }
 
         if (!tryIoctl(VIDIOC_QUERYBUF, &buf)) {
             CV_LOG_WARNING(NULL, "VIDEOIO(V4L2:" << deviceName << "): failed VIDIOC_QUERYBUF: errno=" << errno << " (" << strerror(errno) << ")");
             return false;
         }
 
-        CV_Assert(1 <= num_planes && num_planes <= VIDEO_MAX_PLANES);
-        for (unsigned char n_planes = 0; n_planes < num_planes; n_planes++) {
-            if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-                length = buf.m.planes[n_planes].length;
-                offset = buf.m.planes[n_planes].m.mem_offset;
-            } else {
-                length = buf.length;
-                offset = buf.m.offset;
-            }
+        buffers[n_buffers].length = buf.length;
+        buffers[n_buffers].start =
+            mmap(NULL /* start anywhere */,
+                buf.length,
+                PROT_READ /* required */,
+                MAP_SHARED /* recommended */,
+                deviceHandle, buf.m.offset);
 
-            buffers[n_buffers].memories[n_planes].length = length;
-            buffers[n_buffers].memories[n_planes].start =
-                mmap(NULL /* start anywhere */,
-                     length,
-                     PROT_READ /* required */,
-                     MAP_SHARED /* recommended */,
-                     deviceHandle, offset);
-            if (MAP_FAILED == buffers[n_buffers].memories[n_planes].start) {
-                CV_LOG_WARNING(NULL, "VIDEOIO(V4L2:" << deviceName << "): failed mmap(" << length << "): errno=" << errno << " (" << strerror(errno) << ")");
-                return false;
-            }
+        if (MAP_FAILED == buffers[n_buffers].start) {
+            CV_LOG_WARNING(NULL, "VIDEOIO(V4L2:" << deviceName << "): failed mmap(" << buf.length << "): errno=" << errno << " (" << strerror(errno) << ")");
+            return false;
         }
-
-        maxLength = maxLength > length ? maxLength : length;
+        maxLength = maxLength > buf.length ? maxLength : buf.length;
     }
     if (maxLength > 0) {
-        maxLength *= num_planes;
-        buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start = malloc(maxLength);
-        buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].length = maxLength;
-        buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start = malloc(maxLength);
-        buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].length = maxLength;
+        buffers[MAX_V4L_BUFFERS].start = malloc(maxLength);
+        buffers[MAX_V4L_BUFFERS].length = maxLength;
     }
-    return (buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start != 0) &&
-           (buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start != 0);
+    return buffers[MAX_V4L_BUFFERS].start != 0;
 }
 
 /**
@@ -1130,13 +1043,8 @@ bool CvCaptureCAM_V4L::open(const char* _deviceName)
 bool CvCaptureCAM_V4L::read_frame_v4l2()
 {
     v4l2_buffer buf = v4l2_buffer();
-    v4l2_plane mplanes[VIDEO_MAX_PLANES];
-    buf.type = type;
+    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
-    if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-        buf.m.planes = mplanes;
-        buf.length = VIDEO_MAX_PLANES;
-    }
 
     while (!tryIoctl(VIDIOC_DQBUF, &buf)) {
         int err = errno;
@@ -1153,32 +1061,11 @@ bool CvCaptureCAM_V4L::read_frame_v4l2()
     }
 
     CV_Assert(buf.index < req.count);
-
-    if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-        for (unsigned char n_planes = 0; n_planes < num_planes; n_planes++)
-            CV_Assert(buffers[buf.index].memories[n_planes].length == buf.m.planes[n_planes].length);
-    } else
-        CV_Assert(buffers[buf.index].memories[MEMORY_ORIG].length == buf.length);
+    CV_Assert(buffers[buf.index].length == buf.length);
 
     //We shouldn't use this buffer in the queue while not retrieve frame from it.
     buffers[buf.index].buffer = buf;
     bufferIndex = buf.index;
-
-    if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-        __u32 offset = 0;
-
-        buffers[buf.index].buffer.m.planes = buffers[buf.index].planes;
-        memcpy(buffers[buf.index].planes, buf.m.planes, sizeof(mplanes));
-
-        for (unsigned char n_planes = 0; n_planes < num_planes; n_planes++) {
-            __u32 bytesused;
-            bytesused = buffers[buf.index].planes[n_planes].bytesused -
-                        buffers[buf.index].planes[n_planes].data_offset;
-            offset += bytesused;
-        }
-        buffers[buf.index].bytesused = offset;
-    } else
-        buffers[buf.index].bytesused = buffers[buf.index].buffer.bytesused;
 
     //set timestamp in capture struct to be timestamp of most recent frame
     timestamp = buf.timestamp;
@@ -1510,15 +1397,10 @@ bool CvCaptureCAM_V4L::grabFrame()
         bufferIndex = -1;
         for (__u32 index = 0; index < req.count; ++index) {
             v4l2_buffer buf = v4l2_buffer();
-            v4l2_plane mplanes[VIDEO_MAX_PLANES];
 
-            buf.type = type;
+            buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
             buf.index = index;
-            if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-                buf.m.planes = mplanes;
-                buf.length = VIDEO_MAX_PLANES;
-            }
 
             if (!tryIoctl(VIDIOC_QBUF, &buf)) {
                 CV_LOG_DEBUG(NULL, "VIDEOIO(V4L2:" << deviceName << "): failed VIDIOC_QBUF (buffer=" << index << "): errno=" << errno << " (" << strerror(errno) << ")");
@@ -2007,51 +1889,35 @@ static int sonix_decompress(int width, int height, unsigned char *inp, unsigned 
 
 void CvCaptureCAM_V4L::convertToRgb(const Buffer &currentBuffer)
 {
-    cv::Size imageSize;
-    unsigned char *start;
-
-    if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-        __u32 offset = 0;
-        start = (unsigned char*)buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start;
-        for (unsigned char n_planes = 0; n_planes < num_planes; n_planes++) {
-            __u32 data_offset, bytesused;
-            data_offset = currentBuffer.planes[n_planes].data_offset;
-            bytesused = currentBuffer.planes[n_planes].bytesused - data_offset;
-            memcpy(start + offset, (char *)currentBuffer.memories[n_planes].start + data_offset,
-                   std::min(currentBuffer.memories[n_planes].length, (size_t)bytesused));
-            offset += bytesused;
-        }
-
-        imageSize = cv::Size(form.fmt.pix_mp.width, form.fmt.pix_mp.height);
-    } else {
-        start = (unsigned char*)currentBuffer.memories[MEMORY_ORIG].start;
-
-        imageSize = cv::Size(form.fmt.pix.width, form.fmt.pix.height);
-    }
+    cv::Size imageSize(form.fmt.pix.width, form.fmt.pix.height);
     // Not found conversion
     switch (palette)
     {
     case V4L2_PIX_FMT_YUV411P:
         yuv411p_to_rgb24(imageSize.width, imageSize.height,
-                start, (unsigned char*)frame.imageData);
+                (unsigned char*)(currentBuffer.start),
+                (unsigned char*)frame.imageData);
         return;
     case V4L2_PIX_FMT_SBGGR8:
         bayer2rgb24(imageSize.width, imageSize.height,
-                start, (unsigned char*)frame.imageData);
+                (unsigned char*)currentBuffer.start,
+                (unsigned char*)frame.imageData);
         return;
 
     case V4L2_PIX_FMT_SN9C10X:
         sonix_decompress_init();
         sonix_decompress(imageSize.width, imageSize.height,
-                start, (unsigned char*)buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start);
+                (unsigned char*)currentBuffer.start,
+                (unsigned char*)buffers[MAX_V4L_BUFFERS].start);
 
         bayer2rgb24(imageSize.width, imageSize.height,
-                (unsigned char*)buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start,
+                (unsigned char*)buffers[MAX_V4L_BUFFERS].start,
                 (unsigned char*)frame.imageData);
         return;
     case V4L2_PIX_FMT_SGBRG8:
         sgbrg2rgb24(imageSize.width, imageSize.height,
-                start, (unsigned char*)frame.imageData);
+                (unsigned char*)currentBuffer.start,
+                (unsigned char*)frame.imageData);
         return;
     default:
         break;
@@ -2060,19 +1926,19 @@ void CvCaptureCAM_V4L::convertToRgb(const Buffer &currentBuffer)
     cv::Mat destination(imageSize, CV_8UC3, frame.imageData);
     switch (palette) {
     case V4L2_PIX_FMT_YVU420:
-        cv::cvtColor(cv::Mat(imageSize.height * 3 / 2, imageSize.width, CV_8U, start), destination,
+        cv::cvtColor(cv::Mat(imageSize.height * 3 / 2, imageSize.width, CV_8U, currentBuffer.start), destination,
                      COLOR_YUV2BGR_YV12);
         return;
     case V4L2_PIX_FMT_YUV420:
-        cv::cvtColor(cv::Mat(imageSize.height * 3 / 2, imageSize.width, CV_8U, start), destination,
+        cv::cvtColor(cv::Mat(imageSize.height * 3 / 2, imageSize.width, CV_8U, currentBuffer.start), destination,
                      COLOR_YUV2BGR_IYUV);
         return;
     case V4L2_PIX_FMT_NV12:
-        cv::cvtColor(cv::Mat(imageSize.height * 3 / 2, imageSize.width, CV_8U, start), destination,
+        cv::cvtColor(cv::Mat(imageSize.height * 3 / 2, imageSize.width, CV_8U, currentBuffer.start), destination,
                      COLOR_YUV2RGB_NV12);
         return;
     case V4L2_PIX_FMT_NV21:
-        cv::cvtColor(cv::Mat(imageSize.height * 3 / 2, imageSize.width, CV_8U, start), destination,
+        cv::cvtColor(cv::Mat(imageSize.height * 3 / 2, imageSize.width, CV_8U, currentBuffer.start), destination,
                      COLOR_YUV2RGB_NV21);
         return;
 #ifdef HAVE_JPEG
@@ -2080,54 +1946,89 @@ void CvCaptureCAM_V4L::convertToRgb(const Buffer &currentBuffer)
     case V4L2_PIX_FMT_JPEG:
         CV_LOG_DEBUG(NULL, "VIDEOIO(V4L2:" << deviceName << "): decoding JPEG frame: size=" << currentBuffer.buffer.bytesused);
         if(currentBuffer.buffer.bytesused > 0)
-          cv::imdecode(Mat(1, currentBuffer.buffer.bytesused, CV_8U, start), IMREAD_COLOR, &destination);
+          cv::imdecode(Mat(1, currentBuffer.buffer.bytesused, CV_8U, currentBuffer.start), IMREAD_COLOR, &destination);
         return;
 #endif
     case V4L2_PIX_FMT_YUYV:
-        cv::cvtColor(cv::Mat(imageSize, CV_8UC2, start), destination, COLOR_YUV2BGR_YUYV);
+        cv::cvtColor(cv::Mat(imageSize, CV_8UC2, currentBuffer.start), destination, COLOR_YUV2BGR_YUYV);
         return;
     case V4L2_PIX_FMT_UYVY:
-        cv::cvtColor(cv::Mat(imageSize, CV_8UC2, start), destination, COLOR_YUV2BGR_UYVY);
+        cv::cvtColor(cv::Mat(imageSize, CV_8UC2, currentBuffer.start), destination, COLOR_YUV2BGR_UYVY);
         return;
     case V4L2_PIX_FMT_RGB24:
-        cv::cvtColor(cv::Mat(imageSize, CV_8UC3, start), destination, COLOR_RGB2BGR);
+        cv::cvtColor(cv::Mat(imageSize, CV_8UC3, currentBuffer.start), destination, COLOR_RGB2BGR);
         return;
     case V4L2_PIX_FMT_Y16:
     {
-        cv::Mat temp(imageSize, CV_8UC1, buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start);
-        cv::Mat(imageSize, CV_16UC1, start).convertTo(temp, CV_8U, 1.0 / 256);
+        cv::Mat temp(imageSize, CV_8UC1, buffers[MAX_V4L_BUFFERS].start);
+        cv::Mat(imageSize, CV_16UC1, currentBuffer.start).convertTo(temp, CV_8U, 1.0 / 256);
         cv::cvtColor(temp, destination, COLOR_GRAY2BGR);
         return;
     }
     case V4L2_PIX_FMT_Y12:
     {
-        cv::Mat temp(imageSize, CV_8UC1, buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start);
-        cv::Mat(imageSize, CV_16UC1, start).convertTo(temp, CV_8U, 1.0 / 16);
+        cv::Mat temp(imageSize, CV_8UC1, buffers[MAX_V4L_BUFFERS].start);
+        cv::Mat(imageSize, CV_16UC1, currentBuffer.start).convertTo(temp, CV_8U, 1.0 / 16);
         cv::cvtColor(temp, destination, COLOR_GRAY2BGR);
         return;
     }
     case V4L2_PIX_FMT_Y10:
     {
-        cv::Mat temp(imageSize, CV_8UC1, buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start);
-        cv::Mat(imageSize, CV_16UC1, start).convertTo(temp, CV_8U, 1.0 / 4);
-        cv::cvtColor(temp, destination, COLOR_GRAY2BGR);
+        memcpy(buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start, currentBuffer.memories[MEMORY_ORIG].start,
+            std::min(buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].length, (size_t)currentBuffer.buffer.bytesused));
+
+        // Calculating Y16 size based on Y10 frame size
+        size_t y10FrameSize = currentBuffer.buffer.bytesused;
+        size_t y16FrameSize = (y10FrameSize / 5) * 8;
+
+        // Allocate memory for Y16 frame
+        char *y16Frame = (char *)malloc(1920*1080*2);
+        if (y16Frame == NULL) {
+            printf("Memory allocation failed\n");
+        }
+
+        unsigned char* startPtr = static_cast<unsigned char*>(currentBuffer.memories[MEMORY_ORIG].start);
+
+        // Conversion from Y10 to Y16
+        for (size_t read_file_itr = 0, write_file_itr = 0; read_file_itr < y10FrameSize; read_file_itr += 5, write_file_itr += 8) {
+
+            y16Frame[write_file_itr + 0] = ((startPtr[read_file_itr + 0]) << 2) | ((startPtr[read_file_itr + 4] & 0xC0) >> 6);
+            y16Frame[write_file_itr + 1] = ((startPtr[read_file_itr + 0]) >> 6) & 0x03;
+
+            y16Frame[write_file_itr + 2] = ((startPtr[read_file_itr + 1]) << 2) | ((startPtr[read_file_itr + 4] & 0x30) >> 4);
+            y16Frame[write_file_itr + 3] = ((startPtr[read_file_itr + 1]) >> 6) & 0x03;
+
+            y16Frame[write_file_itr + 4] = ((startPtr[read_file_itr + 2]) << 2) | ((startPtr[read_file_itr + 4] & 0x0C) >> 2);
+            y16Frame[write_file_itr + 5] = ((startPtr[read_file_itr + 2]) >> 6) & 0x03;
+
+            y16Frame[write_file_itr + 6] = ((startPtr[read_file_itr + 3]) << 2) | ((startPtr[read_file_itr + 4] & 0x03));
+            y16Frame[write_file_itr + 7] = ((startPtr[read_file_itr + 3]) >> 6) & 0x03;
+        }
+
+        // If iplImage is not allocated
+        if (frame.imageData == NULL) {
+            printf("Image data in IPL frame is not allocated\n");
+            free(y16Frame);
+        }
+
+        memcpy((char *)frame.imageData, y16Frame, frame.imageSize);
+
+        free(y16Frame);
+        y16Frame = NULL;
+
         return;
     }
     case V4L2_PIX_FMT_GREY:
-        cv::cvtColor(cv::Mat(imageSize, CV_8UC1, start), destination, COLOR_GRAY2BGR);
+        cv::cvtColor(cv::Mat(imageSize, CV_8UC1, currentBuffer.start), destination, COLOR_GRAY2BGR);
         break;
     case V4L2_PIX_FMT_H264:
-        memcpy((char *)frame.imageData, (char *)start,
+        memcpy((char *)frame.imageData, (char *)currentBuffer.start,
                (int)currentBuffer.buffer.bytesused);
-        break;
-    case V4L2_PIX_FMT_XBGR32:
-    case V4L2_PIX_FMT_ABGR32:
-        cv::cvtColor(cv::Mat(imageSize, CV_8UC4, start), destination, COLOR_BGRA2BGR);
         break;
     case V4L2_PIX_FMT_BGR24:
     default:
-        memcpy((char *)frame.imageData, start,
-               std::min(frame.imageSize, (int)currentBuffer.bytesused));
+        memcpy((char *)frame.imageData, (char *)currentBuffer.start,
+               std::min(frame.imageSize, (int)currentBuffer.buffer.bytesused));
         break;
     }
 }
@@ -2398,7 +2299,9 @@ bool CvCaptureCAM_V4L::icvControl(__u32 v4l2id, int &value, bool isSet) const
         return false;
     }
     if (!isSet)
+    {
         value = control.value;
+      }
     return true;
 }
 
@@ -2406,15 +2309,9 @@ double CvCaptureCAM_V4L::getProperty(int property_id) const
 {
     switch (property_id) {
     case cv::CAP_PROP_FRAME_WIDTH:
-        if (V4L2_TYPE_IS_MULTIPLANAR(type))
-            return form.fmt.pix_mp.width;
-        else
-            return form.fmt.pix.width;
+        return form.fmt.pix.width;
     case cv::CAP_PROP_FRAME_HEIGHT:
-        if (V4L2_TYPE_IS_MULTIPLANAR(type))
-            return form.fmt.pix_mp.height;
-        else
-            return form.fmt.pix.height;
+        return form.fmt.pix.height;
     case cv::CAP_PROP_FOURCC:
         return palette;
     case cv::CAP_PROP_FORMAT:
@@ -2430,7 +2327,7 @@ double CvCaptureCAM_V4L::getProperty(int property_id) const
     case cv::CAP_PROP_FPS:
     {
         v4l2_streamparm sp = v4l2_streamparm();
-        sp.type = type;
+        sp.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         if (!tryIoctl(VIDIOC_G_PARM, &sp)) {
             CV_LOG_WARNING(NULL, "VIDEOIO(V4L2:" << deviceName << "): Unable to get camera FPS");
             return -1;
@@ -2894,14 +2791,9 @@ void CvCaptureCAM_V4L::releaseBuffers()
 {
     releaseFrame();
 
-    if (buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start) {
-        free(buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start);
-        buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start = 0;
-    }
-
-    if (buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start) {
-        free(buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start);
-        buffers[MAX_V4L_BUFFERS].memories[MEMORY_RGB].start = 0;
+    if (buffers[MAX_V4L_BUFFERS].start) {
+        free(buffers[MAX_V4L_BUFFERS].start);
+        buffers[MAX_V4L_BUFFERS].start = 0;
     }
 
     bufferIndex = -1;
@@ -2912,14 +2804,11 @@ void CvCaptureCAM_V4L::releaseBuffers()
     v4l_buffersRequested = false;
 
     for (unsigned int n_buffers = 0; n_buffers < MAX_V4L_BUFFERS; ++n_buffers) {
-        for (unsigned char n_planes = 0; n_planes < num_planes; n_planes++) {
-            if (buffers[n_buffers].memories[n_planes].start) {
-                if (-1 == munmap(buffers[n_buffers].memories[n_planes].start,
-                                 buffers[n_buffers].memories[n_planes].length)) {
-                    CV_LOG_DEBUG(NULL, "VIDEOIO(V4L2:" << deviceName << "): failed munmap(): errno=" << errno << " (" << strerror(errno) << ")");
-                } else {
-                    buffers[n_buffers].memories[n_planes].start = 0;
-                }
+        if (buffers[n_buffers].start) {
+            if (-1 == munmap(buffers[n_buffers].start, buffers[n_buffers].length)) {
+                CV_LOG_DEBUG(NULL, "VIDEOIO(V4L2:" << deviceName << "): failed munmap(): errno=" << errno << " (" << strerror(errno) << ")");
+            } else {
+                buffers[n_buffers].start = 0;
             }
         }
     }
@@ -2939,6 +2828,7 @@ bool CvCaptureCAM_V4L::streaming(bool startStream)
             return !startStream;
         }
 
+        type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         bool result = tryIoctl(startStream ? VIDIOC_STREAMON : VIDIOC_STREAMOFF, &type);
         if (result)
         {
@@ -2971,26 +2861,13 @@ IplImage *CvCaptureCAM_V4L::retrieveFrame(int)
     } else {
         // for mjpeg streams the size might change in between, so we have to change the header
         // We didn't allocate memory when not convert_rgb, but we have to recreate the header
-        CV_LOG_DEBUG(NULL, "VIDEOIO(V4L2:" << deviceName << "): buffer input size=" << currentBuffer.bytesused);
-        if (frame.imageSize != (int)currentBuffer.bytesused)
+        CV_LOG_DEBUG(NULL, "VIDEOIO(V4L2:" << deviceName << "): buffer input size=" << currentBuffer.buffer.bytesused);
+        if (frame.imageSize != (int)currentBuffer.buffer.bytesused)
             v4l2_create_frame();
 
-        frame.imageData = (char *)buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start;
-        if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-            __u32 offset = 0;
-            for (unsigned char n_planes = 0; n_planes < num_planes; n_planes++) {
-                __u32 data_offset, bytesused;
-                data_offset = currentBuffer.planes[n_planes].data_offset;
-                bytesused = currentBuffer.planes[n_planes].bytesused - data_offset;
-                memcpy((unsigned char*)buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start + offset,
-                       (char *)currentBuffer.memories[n_planes].start + data_offset,
-                       std::min(currentBuffer.memories[n_planes].length, (size_t)bytesused));
-                offset += bytesused;
-            }
-        } else {
-            memcpy(buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].start, currentBuffer.memories[MEMORY_ORIG].start,
-                   std::min(buffers[MAX_V4L_BUFFERS].memories[MEMORY_ORIG].length, (size_t)currentBuffer.buffer.bytesused));
-        }
+        frame.imageData = (char *)buffers[MAX_V4L_BUFFERS].start;
+        memcpy(buffers[MAX_V4L_BUFFERS].start, currentBuffer.start,
+               std::min(buffers[MAX_V4L_BUFFERS].length, (size_t)currentBuffer.buffer.bytesused));
     }
     //Revert buffer to the queue
     if (!tryIoctl(VIDIOC_QBUF, &buffers[bufferIndex].buffer))

@@ -42,6 +42,8 @@ class MainClass:
         self.hid = hid.HIDControl()
         self.main_menu_init()
         self.main_menu()
+        self.ret_getFormat = None
+        self.tot_Formats = None
 
     def main_menu_init(self):
         '''
@@ -62,8 +64,8 @@ class MainClass:
         self.display2.start_display(self.cap, self.format.get_current_format(), self.device_name)
         self.uvc_obj.get_supported_controls()
 
+        #print(f"Device Path: {self.device_path}")
         if not self.hid.init_hid(self.vid, self.pid, self.device_path):
-            # print("\tHid initialisation Failed")
             self.Is_HID_Opened = False
         else:
             self.Is_HID_Opened = True
@@ -84,12 +86,12 @@ class MainClass:
             5: self.hid_control_menu,
         }
         while True:
-            # print(Capture.StillCapturingImage)
             if not Capture.StillCapturingImage:
                 choice = -1
                 print("\n\t0.EXIT\n\t1.BACK \n\t2.UVC CONTROLS\n\t3.FORMAT SETTINGS\n\t4.CAPTURE STILL IMAGE")
                 if self.Is_HID_Opened:      # Should disable the HID Controls option for non e-con devices.
                     print("\t5.HID PROPERTIES")
+                    self.ret_getFormat, self.tot_Formats = self.cap.getFormats()
                     choice = get_integer("Enter Your Option:", min(main_menu_opt, key=int), max(main_menu_opt, key=int))
                 else:
                     choice = get_integer("Enter Your Option:", min(main_menu_opt, key=int), max(main_menu_opt, key=int)-1)
@@ -158,7 +160,6 @@ class MainClass:
         description: this method is called before program exists. This method
         releases cap, stop display and de_init hid
         '''
-
         self.display2.stop_display()
         self.display2.Kill_Display_thread()
         # When everything done, release the capture

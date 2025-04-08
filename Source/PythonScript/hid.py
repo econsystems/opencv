@@ -28,7 +28,11 @@ class HIDControl:
             self.hid_device_path = ''
             self.hid_handle = None
         if sys.platform == "win32":
-            self.eCAM_dll = ctypes.cdll.LoadLibrary("eCAMFwSw.dll")  # for windows, eCAMFwSW dll is loaded.
+            self.hid_handle = None
+            self.eCAM_dll = ctypes.CDLL(r".\eCAMFwSw.dll")
+            self.eCAMExt_dll = ctypes.CDLL(r".\eCAMFWExt.dll")
+            self.PID = None
+            self.VID = None
 
 
     def init_hid(self, vid, pid, device_path):
@@ -53,8 +57,109 @@ class HIDControl:
         elif sys.platform == "win32":
             if not self.eCAM_dll:
                 return False
+            if not self.eCAMExt_dll:
+                return False
 
-            return self.eCAM_dll.InitExtensionUnit(device_path)
+            # return self.eCAM_dll.InitExtensionUnit(device_path)
+
+            if vid == "2560" and (pid == "0102" or pid == "c123" or pid == "c129"):
+                InitExtensionUnitECAM22 = self.eCAMExt_dll.InitExtensionUnitECAM22
+                InitExtensionUnitECAM22.argtypes = [ctypes.POINTER(ctypes.POINTER(ctypes.c_uint32)), ctypes.c_wchar_p]
+                InitExtensionUnitECAM22.restype = ctypes.c_bool
+
+                # Ensure device_path is a wide string if TCHAR is wchar_t
+                device_path_w = ctypes.c_wchar_p(device_path)
+
+                # Initialize handle as a pointer to pointer of UINT32
+                handle = ctypes.POINTER(ctypes.c_uint32)()
+
+                # Call the function with proper arguments
+                result = InitExtensionUnitECAM22(ctypes.byref(handle),device_path_w)    
+            elif vid == "2560" and pid == "0035":
+                InitTaniaExtensionUnit = self.eCAMExt_dll.InitTaniaExtensionUnit
+                InitTaniaExtensionUnit.argtypes = [ctypes.POINTER(ctypes.POINTER(ctypes.c_uint32)), ctypes.c_wchar_p]
+                InitTaniaExtensionUnit.restype = ctypes.c_bool
+
+                # Ensure device_path is a wide string if TCHAR is wchar_t
+                device_path_w = ctypes.c_wchar_p(device_path)
+
+                # Initialize handle as a pointer to pointer of UINT32
+                handle = ctypes.POINTER(ctypes.c_uint32)()
+
+                # Call the function with proper arguments
+                result = InitTaniaExtensionUnit(ctypes.byref(handle),device_path_w)  
+            elif vid == "2560" and pid == "c05a":
+                InitExtensionUniteCAM51A = self.eCAMExt_dll.InitExtensionUniteCAM51A
+                InitExtensionUniteCAM51A.argtypes = [ctypes.POINTER(ctypes.POINTER(ctypes.c_uint32)), ctypes.c_wchar_p]
+                InitExtensionUniteCAM51A.restype = ctypes.c_bool
+
+                # Ensure device_path is a wide string if TCHAR is wchar_t
+                device_path_w = ctypes.c_wchar_p(device_path)
+
+                # Initialize handle as a pointer to pointer of UINT32
+                handle = ctypes.POINTER(ctypes.c_uint32)()
+
+                # Call the function with proper arguments
+                result = InitExtensionUniteCAM51A(ctypes.byref(handle),device_path_w)  
+            elif vid == "2560" and pid == "c05c":
+                InitExtensionUniteCAM51B = self.eCAMExt_dll.InitExtensionUniteCAM51B
+                InitExtensionUniteCAM51B.argtypes = [ctypes.POINTER(ctypes.POINTER(ctypes.c_uint32)), ctypes.c_wchar_p]
+                InitExtensionUniteCAM51B.restype = ctypes.c_bool
+
+                # Ensure device_path is a wide string if TCHAR is wchar_t
+                device_path_w = ctypes.c_wchar_p(device_path)
+
+                # Initialize handle as a pointer to pointer of UINT32
+                handle = ctypes.POINTER(ctypes.c_uint32)()
+
+                # Call the function with proper arguments
+                result = InitExtensionUniteCAM51B(ctypes.byref(handle),device_path_w)
+            elif vid == "2560" and pid == "c181":
+                InitExtensionUnitECAM82 = self.eCAMExt_dll.InitExtensionUnitECAM82
+                InitExtensionUnitECAM82.argtypes = [ctypes.POINTER(ctypes.POINTER(ctypes.c_uint32)), ctypes.c_wchar_p]
+                InitExtensionUnitECAM82.restype = ctypes.c_bool
+
+                # Ensure device_path is a wide string if TCHAR is wchar_t
+                device_path_w = ctypes.c_wchar_p(device_path)
+
+                # Initialize handle as a pointer to pointer of UINT32
+                handle = ctypes.POINTER(ctypes.c_uint32)()
+
+                # Call the function with proper arguments
+                result = InitExtensionUnitECAM82(ctypes.byref(handle),device_path_w)
+            elif vid == "2560" and pid == "c184":
+                InitExtensionUnitECAM83 = self.eCAMExt_dll.InitExtensionUnitECAM83
+                InitExtensionUnitECAM83.argtypes = [ctypes.POINTER(ctypes.POINTER(ctypes.c_uint32)), ctypes.c_wchar_p]
+                InitExtensionUnitECAM83.restype = ctypes.c_bool
+                
+                # Ensure device_path is a wide string if TCHAR is wchar_t
+                device_path_w = ctypes.c_wchar_p(device_path)
+
+                # Initialize handle as a pointer to pointer of UINT32
+                handle = ctypes.POINTER(ctypes.c_uint32)()
+
+                # Call the function with proper arguments
+                result = InitExtensionUnitECAM83(ctypes.byref(handle),device_path_w)
+            else:      
+                # Adjust according to TCHAR type
+                InitExtensionUnit = self.eCAM_dll.InitExtensionUnit
+                InitExtensionUnit.argtypes = [ctypes.c_wchar_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint32))]
+                InitExtensionUnit.restype = ctypes.c_bool
+
+                # Ensure device_path is a wide string if TCHAR is wchar_t
+                device_path_w = ctypes.c_wchar_p(device_path)
+
+                # Initialize handle as a pointer to pointer of UINT32
+                handle = ctypes.POINTER(ctypes.c_uint32)()
+
+                # Call the function with proper arguments
+                result = InitExtensionUnit(device_path_w, ctypes.byref(handle))
+            
+            if result:
+                self.PID = pid
+                self.VID = vid
+                self.hid_handle = handle
+            return result
 
     def open_hid_handle(self):
         '''
@@ -171,18 +276,45 @@ class HIDControl:
         elif sys.platform == "win32":
             if not self.eCAM_dll:
                 return False
-            pMajorVersion = ctypes.c_uint8()
-            pMinorVersion1 = ctypes.c_uint8()
-            SDK_VER = ctypes.c_uint16()
-            SVN_VER = ctypes.c_uint16()
-
-            res = self.eCAM_dll.ReadFirmwareVersion(ctypes.byref(pMajorVersion), ctypes.byref(pMinorVersion1),
-                                                    ctypes.byref(SDK_VER), ctypes.byref(SVN_VER))
-            if not res:
+            if not self.eCAMExt_dll:
                 return False
+            
+            if self.VID == "2560" and self.PID == "c181":
+                FirmwareVersion1 = ctypes.c_uint8()
+                FirmwareVersion2 = ctypes.c_uint8()
+                FirmwareVersion3 = ctypes.c_uint16()
+
+                result = self.eCAMExt_dll.GetFirmwareVersioneCAM82(
+                    self.hid_handle,
+                    ctypes.byref(FirmwareVersion1),
+                    ctypes.byref(FirmwareVersion2),
+                    ctypes.byref(FirmwareVersion3)
+                )
+
+                if not result:
+                    print("\nFailed to read firmware version for eCAM82.\n")
+                    return False
+
+                # Format firmware version message
+                firmware_message = f"Firmware Version: {FirmwareVersion1.value}.{FirmwareVersion2.value}.{FirmwareVersion3.value}"
+
+                # Print the firmware version to the console
+                print(f"\nFirmware Version (eCAM82) = {firmware_message}\n")
+
+                return True
             else:
-                print(f"\n\tFirmware Version is {pMajorVersion.value}.{pMinorVersion1.value}."
-                      f"{SDK_VER.value}.{SVN_VER.value}")
+                pMajorVersion = ctypes.c_uint8()
+                pMinorVersion1 = ctypes.c_uint8()
+                SDK_VER = ctypes.c_uint16()
+                SVN_VER = ctypes.c_uint16()
+
+                res = self.eCAM_dll.ReadFirmwareVersion(self.hid_handle , ctypes.byref(pMajorVersion), ctypes.byref(pMinorVersion1),
+                                                        ctypes.byref(SDK_VER), ctypes.byref(SVN_VER))
+                if not res:
+                    return False
+                else:
+                    print(f"\n\tFirmware Version is {pMajorVersion.value}.{pMinorVersion1.value}."
+                        f"{SDK_VER.value}.{SVN_VER.value}")
             return True
 
     def deinit_hid(self):
